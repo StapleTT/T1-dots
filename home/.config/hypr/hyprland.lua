@@ -106,8 +106,8 @@ hl.env("XCURSOR_THEME", "MacOS-Tahoe-Cursor")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
--- Qt apps follow ~/.config/kdeglobals ("Island" colour scheme, Darkly style, Rubik), like GTK follows gtk.css
-hl.env("QT_QPA_PLATFORMTHEME", "kde")
+-- Qt apps follow ~/.config/qt6ct/qt6ct.conf ("Island" colour scheme, Darkly style, Rubik), like GTK follows gtk.css
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 
 -----------------------

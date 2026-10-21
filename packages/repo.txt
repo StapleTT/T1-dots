@@ -6,7 +6,6 @@ xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
 quickshell
 polkit
-gdm
 kitty
 fish
 starship
@@ -29,7 +28,6 @@ cliphist
 wl-clipboard
 ttf-jetbrains-mono-nerd
 adw-gtk-theme
-plasma-integration
 python-libarchive-c
 keyutils
 git

@@ -62,6 +62,22 @@ done
 cd "$REPO"
 fc-cache -f >/dev/null
 
+step "Qt theme (qt6ct)"
+# Generated rather than linked: qt6ct needs an absolute path to the colour scheme
+mkdir -p ~/.config/qt6ct
+cat > ~/.config/qt6ct/qt6ct.conf <<EOF
+[Appearance]
+color_scheme_path=$HOME/.local/share/color-schemes/Island.colors
+custom_palette=true
+icon_theme=breeze-plus-dark
+standard_dialogs=default
+style=Darkly
+
+[Fonts]
+fixed="JetBrainsMono Nerd Font,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+general="Rubik,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
+EOF
+
 step "GPU symlinks for hyprland.lua"
 # Machine-specific: point igpu-card (and nvidia-card on hybrid machines) at the right /dev/dri/by-path card.
 if [[ ! -e ~/.config/hypr/igpu-card ]]; then
@@ -72,7 +88,6 @@ fi
 
 step "Services and settings"
 sudo systemctl enable --now NetworkManager bluetooth
-sudo systemctl enable gdm
 [[ "$(getent passwd "$USER" | cut -d: -f7)" == /usr/bin/fish ]] || chsh -s /usr/bin/fish
 sudo usermod -aG i2c "$USER"
 echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf >/dev/null
@@ -96,9 +111,10 @@ if $DESKTOP; then
   done
   cd "$REPO"
   sudo udevadm control --reload
-  sudo systemctl enable libvirtd sunshine-eth-route
+  # gdm: the libvirt hook stops and restarts it around GPU handover
+  sudo systemctl enable gdm libvirtd sunshine-eth-route
   systemctl --user enable app-dev.lizardbyte.app.Sunshine.service
   echo "Define the win11 VM yourself: virsh define <exported win11.xml>"
 fi
 
-step "Done. Reboot, then log in to Hyprland through GDM."
+step "Done. Reboot and log in on tty1; fish starts Hyprland (conf.d/auto-Hypr.fish)."
