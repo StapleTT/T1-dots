@@ -1,0 +1,49 @@
+/*
+ * Monochrome palette matching the Quickshell bar: near-black surfaces, black header bars and popovers
+ * (like the bar's pills), white accent with black text (like its switches). Same colours as
+ * ~/.config/gtk-4.0/gtk.css and the "Island" KDE colour scheme.
+ */
+@define-color accent_color #ffffff;
+@define-color accent_bg_color #ffffff;
+@define-color accent_fg_color #000000;
+@define-color destructive_color #ff453a;
+@define-color destructive_bg_color #ff453a;
+@define-color destructive_fg_color #ffffff;
+@define-color success_color #30d158;
+@define-color success_bg_color #30d158;
+@define-color success_fg_color #000000;
+@define-color warning_color #ffd60a;
+@define-color warning_bg_color #ffd60a;
+@define-color warning_fg_color #000000;
+@define-color error_color #ff453a;
+@define-color error_bg_color #ff453a;
+@define-color error_fg_color #ffffff;
+
+@define-color window_bg_color #121212;
+@define-color window_fg_color #f2f2f2;
+@define-color view_bg_color #0b0b0b;
+@define-color view_fg_color #f2f2f2;
+@define-color headerbar_bg_color #000000;
+@define-color headerbar_fg_color #f2f2f2;
+@define-color headerbar_border_color #f2f2f2;
+@define-color headerbar_backdrop_color #000000;
+@define-color headerbar_shade_color rgba(0, 0, 0, 0.36);
+@define-color sidebar_bg_color #0b0b0b;
+@define-color sidebar_fg_color #f2f2f2;
+@define-color sidebar_backdrop_color #0b0b0b;
+@define-color sidebar_shade_color rgba(0, 0, 0, 0.36);
+@define-color secondary_sidebar_bg_color #121212;
+@define-color secondary_sidebar_fg_color #f2f2f2;
+@define-color secondary_sidebar_backdrop_color #121212;
+@define-color card_bg_color #1c1c1e;
+@define-color card_fg_color #f2f2f2;
+@define-color card_shade_color rgba(0, 0, 0, 0.36);
+@define-color dialog_bg_color #1c1c1e;
+@define-color dialog_fg_color #f2f2f2;
+@define-color popover_bg_color #000000;
+@define-color popover_fg_color #f2f2f2;
+@define-color popover_shade_color rgba(0, 0, 0, 0.25);
+@define-color thumbnail_bg_color #1c1c1e;
+@define-color thumbnail_fg_color #f2f2f2;
+@define-color shade_color rgba(0, 0, 0, 0.36);
+@define-color scrollbar_outline_color rgba(0, 0, 0, 0.5);

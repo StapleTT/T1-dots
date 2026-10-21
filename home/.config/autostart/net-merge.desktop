@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=net-merge
+Comment=Use all your network adapters at once
+Exec=/usr/bin/net-merge tray
+Terminal=false
+X-GNOME-Autostart-enabled=true

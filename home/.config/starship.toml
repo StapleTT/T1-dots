@@ -1,0 +1,377 @@
+# macOS / Linux hybrid: the macOS Terminal layout (user@host dir, then % on its own line for input), plain text instead of pills,
+# with Linux touches: Arch logo, git branch and status, command time and exit code on the right.
+# Colours are the kitty theme's (~/.config/kitty/theme.conf): 15 white, 7 light grey, 8 grey, 9 red.
+
+add_newline = true # a blank line between commands
+format = """
+$os$username$hostname $directory$git_branch$git_status$git_state
+$character"""
+right_format = "$cmd_duration$status"
+
+[os]
+disabled = false
+style = "fg:7"
+format = "[$symbol]($style)"
+
+[os.symbols]
+AIX = " "
+AlmaLinux = " "
+Alpaquita = " "
+Alpine = " "
+ALTLinux = " "
+Amazon = " "
+Android = " "
+AOSC = " "
+Arch = " "
+Artix = " "
+Bluefin = " "
+CachyOS = " "
+CentOS = " "
+Debian = " "
+DragonFly = " "
+Elementary = " "
+Emscripten = " "
+EndeavourOS = " "
+Fedora = " "
+FreeBSD = " "
+Garuda = " "
+Gentoo = " "
+HardenedBSD = "󰞌 "
+Illumos = " "
+InstantOS = " "
+Ios = "󰀷 "
+Kali = " "
+Linux = " "
+Mabox = " "
+Macos = " "
+Manjaro = " "
+Mariner = " "
+MidnightBSD = " "
+Mint = " "
+NetBSD = " "
+NixOS = " "
+Nobara = " "
+OpenBSD = " "
+OpenCloudOS = " "
+openEuler = " "
+openSUSE = " "
+OracleLinux = "󰺡 "
+PikaOS = " "
+Pop = " "
+Raspbian = " "
+Redhat = "󱄛 "
+RedHatEnterprise = "󱄛 "
+Redox = "󰀘 "
+RockyLinux = " "
+Solus = " "
+SUSE = " "
+Ubuntu = " "
+Ultramarine = " "
+Unknown = " "
+Uos = " "
+Void = " "
+Windows = "󰍲 "
+Zorin = " "
+
+
+[username]
+show_always = true
+style_user = "bold fg:15"
+style_root = "bold fg:9"
+format = "[$user]($style)"
+
+[hostname]
+ssh_symbol = " "
+ssh_only = false
+style = "fg:8"
+format = "[@$hostname( $ssh_symbol)]($style)" # SSH icon only over SSH
+
+[directory]
+style = "bold fg:15"
+read_only = " 󰌾"
+read_only_style = "fg:8"
+home_symbol = "~"
+truncation_length = 3
+truncate_to_repo = true
+truncation_symbol = "…/"
+format = "[$path]($style)[$read_only]($read_only_style)"
+
+[git_branch]
+symbol = " "
+style = "fg:7"
+format = "[ $symbol$branch]($style)"
+
+# Nerd Font icons (Font Awesome set), with counts where useful
+[git_status]
+style = "fg:8"
+format = "([ $all_status$ahead_behind]($style))"
+conflicted = "\uf071 ${count} "
+ahead = "\uf062${count} "
+behind = "\uf063${count} "
+diverged = "\uf0ec \uf062${ahead_count} \uf063${behind_count} "
+untracked = "\uf128${count} "
+stashed = "\uf01c ${count} "
+modified = "\uf040 ${count} "
+staged = "\uf067${count} "
+renamed = "\uf061 ${count} "
+deleted = "\uf1f8 ${count} "
+
+[git_state]
+style = "fg:11"
+format = ' [\($state( $progress_current/$progress_total)\)]($style)'
+
+# Input line: macOS zsh's % (white, red after a failed command); also what transient prompt leaves behind
+[character]
+success_symbol = "[%](bold fg:15)"
+error_symbol = "[%](bold fg:9)"
+vimcmd_symbol = "[%](bold fg:10)"
+
+[cmd_duration]
+min_time = 2000
+style = "fg:8"
+format = "[$duration]($style)"
+
+[status]
+symbol = " "
+disabled = false
+style = "fg:9"
+format = "[ $symbol$status]($style)"
+
+[package]
+symbol = "󰏗 "
+disabled = true
+
+# ---- Nerd Font Symbols preset (starship preset nerd-font-symbols) ----
+# Icons for modules not in the prompt's format above; ready if one is added
+
+[aws]
+symbol = " "
+
+[azure]
+symbol = " "
+
+[battery]
+full_symbol = "󰁹 "
+charging_symbol = "󰂄 "
+discharging_symbol = "󰂃 "
+unknown_symbol = "󰂑 "
+empty_symbol = "󰂎 "
+
+[buf]
+symbol = " "
+
+[bun]
+symbol = " "
+
+[c]
+symbol = " "
+
+[cpp]
+symbol = " "
+
+[cmake]
+symbol = " "
+
+[cobol]
+symbol = " "
+
+[conda]
+symbol = " "
+
+[container]
+symbol = " "
+
+[crystal]
+symbol = " "
+
+[dart]
+symbol = " "
+
+[deno]
+symbol = " "
+
+[direnv]
+symbol = " "
+
+[docker_context]
+symbol = " "
+
+[dotnet]
+symbol = " "
+
+[elixir]
+symbol = " "
+
+[elm]
+symbol = " "
+
+[erlang]
+symbol = " "
+
+[fennel]
+symbol = " "
+
+[fortran]
+symbol = " "
+
+[fossil_branch]
+symbol = " "
+
+[gcloud]
+symbol = "󱇶 "
+
+[gleam]
+symbol = " "
+
+[git_commit]
+tag_symbol = '  '
+
+[golang]
+symbol = " "
+
+[gradle]
+symbol = " "
+
+[guix_shell]
+symbol = " "
+
+[haskell]
+symbol = " "
+
+[haxe]
+symbol = " "
+
+[helm]
+symbol = " "
+
+[hg_branch]
+symbol = " "
+
+[java]
+symbol = " "
+
+[julia]
+symbol = " "
+
+[kotlin]
+symbol = " "
+
+[kubernetes]
+symbol = "󱃾 "
+
+[lua]
+symbol = " "
+
+[maven]
+symbol = " "
+
+[memory_usage]
+symbol = "󰍛 "
+
+[meson]
+symbol = "󰔷 "
+
+[mojo]
+symbol = "󰈸 "
+
+[nats]
+symbol = " "
+
+[netns]
+symbol = "󰛳 "
+
+[nim]
+symbol = " "
+
+[nix_shell]
+symbol = " "
+
+[nodejs]
+symbol = " "
+
+[ocaml]
+symbol = " "
+
+[odin]
+symbol = "󰟢 "
+
+[opa]
+symbol = " "
+
+[openstack]
+symbol = " "
+
+[perl]
+symbol = " "
+
+[php]
+symbol = " "
+
+[pijul_channel]
+symbol = " "
+
+[pixi]
+symbol = "󰏗 "
+
+[pulumi]
+symbol = " "
+
+[purescript]
+symbol = " "
+
+[python]
+symbol = " "
+
+[raku]
+symbol = "󱖊 "
+
+[red]
+symbol = "󱍼 "
+
+[rlang]
+symbol = "󰟔 "
+
+[ruby]
+symbol = " "
+
+[rust]
+symbol = "󱘗 "
+
+[scala]
+symbol = " "
+
+[shlvl]
+symbol = "󰹍 "
+
+[singularity]
+symbol = " "
+
+[solidity]
+symbol = " "
+
+[spack]
+symbol = " "
+
+[sudo]
+symbol = " "
+
+[swift]
+symbol = " "
+
+[terraform]
+symbol = " "
+
+[vlang]
+symbol = " "
+
+[typst]
+symbol = " "
+
+[vagrant]
+symbol = " "
+
+[xmake]
+symbol = " "
+
+[zig]
+symbol = " "

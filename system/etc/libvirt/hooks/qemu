@@ -1,0 +1,50 @@
+#!/bin/bash
+# libvirt qemu hook. Args: <vm> <operation> <sub-operation>
+# win11 takes the 5070 Ti. Detaching a card that's still open hangs, so before the VM starts,
+# stop GDM (which ends the desktop session and the login screen, both of which use the card).
+# Once the card belongs to the VM, start GDM again: it can only see the iGPU, so login shows on HDMI.
+# win11 also gets the ROCKET NVMe (/mnt/rocket) as a raw disk. NTFS mounted by Linux and Windows
+# at the same time gets corrupted, so it's unmounted while the VM runs and remounted afterwards.
+[[ $1 == win11 ]] || exit 0
+
+gpu=(/dev/nvidia* /dev/dri/by-path/pci-0000:01:00.0-*)
+rocket=/mnt/rocket
+busy() { fuser -s "${gpu[@]}" 2>/dev/null; }
+wait_free() { for _ in $(seq "$1"); do busy || return 0; sleep 0.5; done; return 1; }
+abort() {
+    echo "win11: $1, not starting VM:" >&2
+    shift; "$@" >&2
+    systemctl --no-block start gdm
+    exit 1
+}
+
+case "$2/$3" in
+prepare/begin)
+    if busy; then
+        systemctl stop gdm
+        if ! wait_free 20; then
+            fuser -k -TERM "${gpu[@]}" 2>/dev/null
+            wait_free 10 || abort "5070 Ti still in use" fuser -v "${gpu[@]}"
+        fi
+    fi
+    if mountpoint -q "$rocket" && ! umount "$rocket"; then
+        fuser -k -TERM -m "$rocket" 2>/dev/null
+        sleep 2
+        umount "$rocket" || abort "$rocket still in use" fuser -vm "$rocket"
+    fi
+    ;;
+started/begin)
+    systemctl --no-block start gdm
+    # Block suspend (e.g. hypridle's 15-minute suspend) for as long as the VM runs.
+    systemd-run --unit=win11-inhibit --collect \
+        systemd-inhibit --what=sleep --who=win11 --why="Windows VM is running" sleep infinity
+    # Hand over the Quest if it's already plugged in (see /etc/udev/rules.d/70-quest-vm.rules).
+    udevadm trigger --action=add /sys/bus/usb/devices/2-1 2>/dev/null
+    ;;
+release/end)
+    # Also covers a VM start that failed after GDM was stopped.
+    systemctl --no-block start gdm
+    systemctl stop win11-inhibit 2>/dev/null
+    mountpoint -q "$rocket" || mount "$rocket"
+    ;;
+esac

@@ -1,0 +1,20 @@
+#!/bin/bash
+# Pass the Quest 3S on USB port 2-1 through to the running win11 VM.
+# The Quest reconnects as a new USB device (new product ID) every time it switches mode,
+# e.g. into Link, so a fixed USB passthrough loses it. udev runs this on every reconnect:
+# drop the stale passthrough and attach whatever is on the port now.
+# Run via systemd-run, never directly from udev or the libvirt hook: virsh blocks.
+port=/sys/bus/usb/devices/2-1
+v() { virsh -c qemu:///system "$@"; }
+
+exec 9>/run/win11-quest.lock
+flock 9
+[[ $(v domstate win11 2>/dev/null) == running ]] || exit 0
+v detach-device-alias win11 ua-quest --live 2>/dev/null || true
+[[ $(cat "$port/idVendor" 2>/dev/null) == 2833 ]] || exit 0
+v attach-device win11 /dev/stdin --live <<XML
+<hostdev mode='subsystem' type='usb' managed='yes'>
+  <source><address bus='$(cat "$port/busnum")' device='$(cat "$port/devnum")'/></source>
+  <alias name='ua-quest'/>
+</hostdev>
+XML

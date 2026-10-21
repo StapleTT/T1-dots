@@ -1,0 +1,3 @@
+# Quest 3S on USB port 2-1 (the CPU's USB-C port): hand it to the win11 VM each time it (re)connects.
+ACTION=="add", SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", KERNEL=="2-1", ATTR{idVendor}=="2833", \
+  RUN+="/usr/bin/systemd-run --no-block --collect /usr/local/bin/win11-quest-attach"

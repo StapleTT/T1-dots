@@ -1,0 +1,33 @@
+[Default Applications]
+x-scheme-handler/claude-cli=claude-code-url-handler.desktop
+x-scheme-handler/http=zen.desktop
+x-scheme-handler/https=zen.desktop
+x-scheme-handler/chrome=zen.desktop
+text/html=zen.desktop
+application/x-extension-htm=zen.desktop
+application/x-extension-html=zen.desktop
+application/x-extension-shtml=zen.desktop
+application/xhtml+xml=zen.desktop
+application/x-extension-xhtml=zen.desktop
+application/x-extension-xht=zen.desktop
+x-scheme-handler/discord=vesktop.desktop
+x-scheme-handler/itms=sidra.desktop
+audio/mpeg=com.github.neithern.g4music.desktop
+video/mp4=vlc.desktop
+x-scheme-handler/sgdb=com.steamgriddb.SGDBoop.desktop
+application/x-mswinurl=netmojo.omdrop-links.desktop
+application/x-webloc=netmojo.omdrop-links.desktop
+
+[Added Associations]
+x-scheme-handler/http=zen.desktop;
+x-scheme-handler/https=zen.desktop;
+x-scheme-handler/chrome=zen.desktop;
+text/html=zen.desktop;
+application/x-extension-htm=zen.desktop;
+application/x-extension-html=zen.desktop;
+application/x-extension-shtml=zen.desktop;
+application/xhtml+xml=zen.desktop;
+application/x-extension-xhtml=zen.desktop;
+application/x-extension-xht=zen.desktop;
+audio/mpeg=com.github.neithern.g4music.desktop;
+video/mp4=vlc.desktop;
