@@ -17,6 +17,7 @@ video/mp4=vlc.desktop
 x-scheme-handler/sgdb=com.steamgriddb.SGDBoop.desktop
 application/x-mswinurl=netmojo.omdrop-links.desktop
 application/x-webloc=netmojo.omdrop-links.desktop
+video/matroska=vlc.desktop
 
 [Added Associations]
 x-scheme-handler/http=zen.desktop;
@@ -31,3 +32,4 @@ application/x-extension-xhtml=zen.desktop;
 application/x-extension-xht=zen.desktop;
 audio/mpeg=com.github.neithern.g4music.desktop;
 video/mp4=vlc.desktop;
+video/matroska=vlc.desktop;

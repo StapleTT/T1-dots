@@ -19,7 +19,6 @@
 -- The libvirt hook (/etc/libvirt/hooks/qemu) ends this session before the VM takes the card.
 -- Symlinks point at /dev/dri/by-path/... because AQ_DRM_DEVICES splits on ':' and cardN can renumber.
 local nvidia_bound = io.open("/sys/bus/pci/drivers/nvidia/0000:01:00.0/vendor")
-local on_nvidia = nvidia_bound ~= nil
 if nvidia_bound then
 	nvidia_bound:close()
 	hl.env("AQ_DRM_DEVICES", os.getenv("HOME") .. "/.config/hypr/nvidia-card")
@@ -49,9 +48,8 @@ hl.monitor({
 	mode = "2560x1440@279.96",
 	position = "auto",
 	scale = 1,
-	-- On the 5070 Ti, 10-bit (XR30) buffers fail to allocate and Hyprland aborts, so HDR is iGPU-only for now.
-	bitdepth = on_nvidia and 8 or 10,
-	cm = on_nvidia and "srgb" or "hdr",
+	bitdepth = 10,
+	cm = "hdr",
 	sdr_eotf = "gamma22",
 	sdr_min_luminance = 0.0,
 	sdrbrightness = 3.40,
@@ -169,10 +167,10 @@ hl.config({
 
 		shadow = {
 			enabled = true,
-			range = 20,
-			offset = { 0, 2 },
-			render_power = 10,
-			color = "rgba(00000020)",
+			range = 26,
+			offset = { 0, 3 },
+			render_power = 2,
+			color = "rgba(000000b0)",
 		},
 
 		blur = {
