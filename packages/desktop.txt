@@ -2,4 +2,3 @@ gdm
 libvirt
 qemu-full
 virt-manager
-sunshine-bin

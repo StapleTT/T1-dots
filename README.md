@@ -13,7 +13,7 @@ This repo holds the setup; `install.sh` puts it on a fresh machine (see [Install
 install.sh                 the installer; --desktop adds the T1-only extras
 packages/repo.txt          official-repo packages
 packages/aur.txt           AUR packages
-packages/desktop.txt       T1 only (--desktop): gdm, libvirt, qemu-full, virt-manager, sunshine-bin
+packages/desktop.txt       T1 only (--desktop): gdm, libvirt, qemu-full, virt-manager
 home/                      mirrors ~; every file is symlinked into place, so edits land in the repo
 system/                    T1-only files under /etc, /usr/local/bin, plus zen.desktop (copied, not linked)
 ```
@@ -27,7 +27,7 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 ```
 ~/
 ├── omdrop-plugin/                      git clone of netmojo-systems/omdrop-plugin (AirDrop CLI + receiver)
-├── Pictures/Wallpapers/                27-Golden-Gate.png (the one in use) + 2 others
+├── Pictures/Wallpapers/                27-Golden-Gate-Dark.png (the one in use), 27-Golden-Gate.png + 2 others
 ├── .config/
 │   ├── hypr/
 │   │   ├── hyprland.lua                compositor config (Lua; Hyprland 0.56)
@@ -41,6 +41,7 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 │   │   ├── AirDrop.qml                 AirDrop logic for the tray (drives the omdrop CLI)
 │   │   └── icons/                      custom SVGs: airdrop, bluetooth, cup, cup_fill
 │   ├── kitty/                          kitty.conf, theme.conf (terminal + monochrome theme), search.py + scroll_mark.py (ctrl+f search kitten)
+│   ├── mpv/mpv.conf                    video player: gpu-next + Vulkan so HDR (PQ/BT.2020) passes through to Hyprland
 │   ├── starship.toml                   prompt
 │   ├── fish/
 │   │   ├── config.fish                 interactive setup, aliases, starship
@@ -53,8 +54,7 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 │   ├── mimeapps.list                   default apps (Zen for HTML)
 │   ├── airdrop/config.toml             omdrop: device name, download dir (written by omdrop)
 │   └── systemd/user/
-│       ├── airdrop-receiver.service(.d/)   written by `omdrop setup`; started per receive window, not enabled
-│       └── graphical-session.target.wants/   Sunshine game streaming (--desktop)
+│       └── airdrop-receiver.service(.d/)   written by `omdrop setup`; started per receive window, not enabled
 ├── .local/
 │   ├── bin/omdrop -> ~/omdrop-plugin/bin/omdrop
 │   └── share/
@@ -68,12 +68,11 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 /etc (system, root-owned; all but pacman.conf from system/ with --desktop)
 ├── libvirt/hooks/qemu                  win11 VM: hands over the 5070 Ti and the ROCKET NVMe, restarts GDM
 ├── udev/rules.d/70-quest-vm.rules      passes the Quest headset to the VM
-├── systemd/system/sunshine-eth-route.service   forces Sunshine over Ethernet
 ├── modprobe.d/amd-sev.conf, kvm-amd.conf
 ├── modules-load.d/i2c-dev.conf         i2c-dev for ddcutil (written by install.sh)
 └── pacman.conf                         extra [net-merge] repository (added by install.sh)
 
-/usr/local/bin                          win11-quest-attach, sunshine-eth-route.sh (--desktop), zen -> /opt/zen/zen, SGDBoop (manual)
+/usr/local/bin                          win11-quest-attach (--desktop), zen -> /opt/zen/zen, SGDBoop (manual)
 ```
 
 ## Config files
@@ -83,7 +82,7 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 | `~/.config/hypr/hyprland.lua` | Hyprland default config from `/usr/share/hypr/hyprland.lua`, plus the edits in [Changes from default hyprland.lua](#changes-from-default-hyprlandlua) |
 | `~/.config/hypr/hypridle.conf` | Lock after 5 min idle (`loginctl lock-session` -> `qs ipc call lock lock`), screen off (DPMS) at 5.5 min, back on at any input; locks before suspend. No idle suspend |
 | `~/.config/hypr/hyprlock.conf` | Unused (lock screen is in Quickshell). Fallback if the Quickshell lock ever breaks: from a TTY, `WAYLAND_DISPLAY=wayland-1 hyprlock` |
-| `~/.config/hypr/hyprpaper.conf` | Wallpaper `~/Pictures/Wallpapers/27-Golden-Gate.png` on all monitors, `fit_mode = cover`, no splash |
+| `~/.config/hypr/hyprpaper.conf` | Wallpaper `~/Pictures/Wallpapers/27-Golden-Gate-Dark.png` on all monitors, `fit_mode = cover`, no splash |
 | `~/.config/hypr/scripts/screenshot.sh` | `region\|screen\|window [save]`: grim (+ slurp styled like the bar for regions) -> PNG copied to the clipboard; `save` also keeps it in `~/Pictures/Screenshots`. Notifies when done |
 | `~/.config/hypr/igpu-card`, `nvidia-card` | Symlinks to `/dev/dri/by-path/pci-0000:0d:00.0-card` (iGPU) and `pci-0000:01:00.0-card` (5070 Ti), used by GPU switching. By-path because `AQ_DRM_DEVICES` splits on `:` and `cardN` can renumber. Machine-specific: recreate on new hardware |
 | `~/.config/quickshell/shell.qml` | The whole desktop shell, see [Quickshell](#quickshell) |
@@ -107,30 +106,37 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 
 **Top bar**: separate black pills with shadows (dynamic-island style), per monitor. All pills resize with the same spring. Left to right:
 
+- **User menu** (top left, left of the workspaces): a pill with the distro's logo, a Nerd Font glyph (JetBrainsMono Nerd Font, `ttf-jetbrains-mono-nerd`) picked from `/etc/os-release` `ID`, then `ID_LIKE`, falling back to Tux; ~60 distros mapped in `distroGlyphs`. Click for a card below it: user (`$USER`), then hostname (`/etc/hostname`) · uptime on the line below (`/proc/uptime`, sampled with the network status every 2 s), then Lock, Suspend, Log out (`hl.dsp.exit()`), Restart, Shut down.
 - **Workspaces** (click to switch). One dot per workspace number from 1 to the highest workspace on the monitor, so empty workspaces in between show as grey dots and a dot's position is its number; wide when active. A workspace with windows has its dot filled with the most vivid colour of its first window's app icon (Quickshell ColorQuantizer; greyscale icons such as Zen's give white), dimmed when inactive; empty workspaces stay grey. Colours are computed once per app and cached (`appColors`), so dots rebuilt when the workspace count changes get their colour instantly; no colour animation (it caused a white flash); grey only while an app's colour is first computed. Icon files are found from the desktop entry (absolute paths like Zen's used directly) or by searching ~/.local/share/icons, hicolor, Adwaita and /usr/share/pixmaps, since ColorQuantizer can't read theme icon URLs.
-- **Centre group**: a small music circle (only while media is playing) and the focused window title (max 600px).
+- **Centre group**: a small music circle (while media is playing or paused; hidden once stopped. When paused it keeps the player that last played, not the first MPRIS player) and the focused window title (max 600px). With no focused window (e.g. an empty workspace) the title island springs down to nothing and fades out, keeping its last title while it shrinks, and the music circle slides back to the centre.
   - Clicking the circle morphs the title island into a **media player** (album art, title, artist, click-to-seek progress, prev / play-pause / next; closes on outside click).
-  - **Volume/brightness popup**: when the default output's volume or mute changes (media keys, apps, any mixer; Quickshell PipeWire), or on the brightness keys, the title island morphs into a 320px pill with icon, level bar and percentage for 1.5 s (content laid out at the popup's final size so the morph from a long title doesn't stretch it; the level, not the bar width, is animated; the title fades out before the popup content fades in and returns only after it has faded out) (focused monitor; not while the launcher, player or a password prompt is open, nor while the audio panel is open). Brightness is the monitor's own setting over DDC/CI (`ddcutil setvcp 10`, no backlight on this desktop): Quickshell keeps the value (read with `ddcutil getvcp 10` at start) so the popup updates instantly, coalesces writes 150 ms, and retries because the monitor sometimes answers `DDCRC_VERIFY`. Brightness keys call `qs ipc call osd brightnessUp|brightnessDown` (5% steps).
+  - **Volume/brightness popup**: when the default output's volume or mute changes (media keys, apps, any mixer; Quickshell PipeWire), or on the brightness keys, the title island morphs into a 320px pill with icon, level bar and percentage for 1.5 s (content laid out at the popup's final size so the morph from a long title doesn't stretch it; the level, not the bar width, is animated; the title fades out before the popup content fades in and returns only after it has faded out) (focused monitor; not while the launcher, player or a password prompt is open, nor while the audio panel is open). Over a fullscreen window the bar moves to the Overlay layer until the popup has faded out; the rest of the bar stays hidden while a window is fullscreen, so only the popup shows. Brightness is the monitor's own setting over DDC/CI (`ddcutil setvcp 10`, no backlight on this desktop): Quickshell keeps the value (read with `ddcutil getvcp 10` at start) so the popup updates instantly, coalesces writes 150 ms, and retries because the monitor sometimes answers `DDCRC_VERIFY`. Brightness keys call `qs ipc call osd brightnessUp|brightnessDown` (5% steps).
   - **Launcher**: the title island morphs with a spring animation into the app launcher on SUPER+Space (search apps by name / generic name / keywords; last row runs the text as a shell command, Shift+Enter runs it in kitty; arrows/Tab to move, Enter to launch, Esc or click outside to close).
   - **Clipboard**: SUPER+SHIFT+V opens the launcher in clipboard mode: cliphist history newest first (8 shown, type to search older), Enter copies, Shift+Del removes.
-- **Clock** (date/time): click to morph the pill into a month calendar below the time, same spring: weeks start on the locale's first day, today filled white, chevrons or scroll wheel change month, reopens on the current month; closes like the tray panels.
 - **System tray**, left to right:
-  - **App tray chevron** (shown only when apps have tray icons). App tray icons (StatusNotifierItem) aren't pinned to the bar: the chevron opens a dropdown listing them; left click opens the app (or its menu if that's all it has), right click shows the app's menu inside the dropdown (with Back for submenus), middle click runs its secondary action. App names come from desktop entries where the tray item only gives an ID.
-  - **AirDrop** (`icons/airdrop.svg`), see [AirDrop](#airdrop-omdrop).
+  - **App tray chevron** (shown only when apps have tray icons). App tray icons (StatusNotifierItem) hide behind a chevron pointing left; clicking it springs the tray pill out to the left with just the icons (no names), and the chevron points right to collapse it. Left click opens the app (or its menu if that's all it has), right click shows the app's menu in a card below the pill whose left edge lines up with the click (kept on screen), only as wide as its entries (Back only for submenus; Back on the app's own menu isn't shown, click another icon or outside to close), middle click runs its secondary action, scroll is passed to the app.
   - **Speaker**: icon follows the volume; scroll on it for 2% steps; click for the audio panel: volume slider, click the speaker to mute, then output devices with a check on the default, click one to switch (`Pipewire.preferredDefaultAudioSink`); HDMI/DP outputs named after the monitor get the card added when two share a name.
-  - **Wi-Fi** (Ethernet arrows when wired without Wi-Fi): panel with Wi-Fi/Ethernet status, Wi-Fi on/off (`nmcli`), and a Bluetooth section (Quickshell.Bluetooth) with on/off and paired devices, click to connect/disconnect, battery when the device reports it. Pairing new devices still needs `bluetoothctl`.
-  - **Bluetooth** icon only while a device is connected (custom `icons/bluetooth.svg`; opens the Wi-Fi panel).
-  - **Notifications bell**, shown only while there are notifications; the panel shows the latest 6, with Clear all.
-  - **Power**: first row "Keep awake" (coffee cup, custom `icons/cup.svg` / `cup_fill.svg`, with a switch) toggles an IdleInhibitor that hypridle honours: no idle lock or screen-off while it's filled. Remembered across Quickshell restarts in `~/.local/state/quickshell/keep-awake`. Also `qs ipc call keepAwake set true|false`, `toggle`, `get`. Note hypridle also honours apps' own dbus inhibits (e.g. Zen while playing media). Then Lock, Suspend, Log out (`hl.dsp.exit()`), Restart, Shut down.
+  - **Wi-Fi** (Ethernet arrows when wired without Wi-Fi): panel with a Wi-Fi switch at the top (`nmcli radio wifi`), an Ethernet row while wired, then Networks: rescanned every 10 s while the panel is open (`nmcli dev wifi list --rescan yes`), one row per SSID, connected first then by signal, lock icon on secured ones. Click a saved network to connect (`nmcli con up id`), an open one to join; a new secured one opens a password field (Enter connects with `nmcli dev wifi connect … password …`, Esc closes). On failure it shows an error and offers the password field again. nmcli is called with argument lists, never through a shell, since SSIDs come from whoever runs the network. Hidden networks and disconnecting aren't supported in the panel.
+  - **Control center** (`slider_horizontal_3`):
+    - **AirDrop**: switch on the right turns it on/off; the rest of the row opens its panel; see [AirDrop](#airdrop-omdrop).
+    - **Bluetooth** (shows N connected; Quickshell.Bluetooth): switch turns the adapter on/off; the rest of the row opens its panel: on/off, paired devices (click to connect/disconnect, battery when the device reports it), then Nearby: the adapter scans (`discovering`) only while this panel is open, listing unpaired devices that have a name; click one to trust, pair and then connect. No pairing agent is registered, so devices that need a PIN (keyboards) still need `bluetoothctl`. AirDrop and Bluetooth panels have a "Control Center" back row; the button closes the card from either.
+    - "Keep awake" (coffee cup, custom `icons/cup.svg` / `cup_fill.svg`, with a switch) toggles an IdleInhibitor that hypridle honours: no idle lock or screen-off while it's filled. Remembered across Quickshell restarts in `~/.local/state/quickshell/keep-awake`. Also `qs ipc call keepAwake set true|false`, `toggle`, `get`. Note hypridle also honours apps' own dbus inhibits (e.g. Zen while playing media).
+    - **Notifications**, newest first, all of them (scrolls past 320px), with Clear all; hidden when there are none.
+  - Power options are in the user menu (top left).
+- **Clock** (date/time), far right corner: click to morph the pill into a month calendar below the time, same spring: weeks start on the locale's first day, today filled white, chevrons or scroll wheel change month, reopens on the current month; closes like the tray panels.
 
-Each tray icon morphs the tray pill (same spring animation as the launcher and media player) into a panel below its icons, and the clock slides aside. Panels close on any other click (windows, wallpaper, empty bar space, other bar buttons); the focus grab starts 50 ms after opening, otherwise it clears immediately.
+Every tray panel (audio, Wi-Fi, control center) opens in one 340px card in the top right corner of the screen, below the pills (app menus use the same card, placed and sized as above); its height springs between panels. Panels close on any other click (windows, wallpaper, empty bar space, other bar buttons); the focus grab starts 50 ms after opening, otherwise it clears immediately.
+
+**Animations**: all motion (pill and island resize/morph and their corner radius, workspace dots, music circle, switches, panel card height, overview open/close, volume/brightness level bar) uses one shared spring, the `Motion` component (`spring: 5.5; damping: 0.4`, about 2.5% overshoot; switches stiffer at `6 / 0.46`). A spring that is retargeted mid-flight (e.g. closing while opening) keeps its velocity instead of restarting. Fades, colour changes and the shake on a wrong password are still fixed-duration.
+
+Note: adding a new inline `component` to shell.qml can fail on hot reload ("X is not a type"); `quickshell kill; quickshell -d` loads it fine.
 
 **Also in shell.qml:**
 
 - **Lock screen** (WlSessionLock + PAM `login`): wallpaper read from hyprpaper.conf, date + large 12-hour time just above centre, black pill password field 140px from the bottom; wrong password shakes it and shows the error; Esc clears. Locked from the power menu or `qs ipc call lock lock`; `misc.allow_session_lock_restore = true` in hyprland.lua so a restarted qs can re-lock if it crashes while locked.
 - **Polkit agent**: password prompts morph the title island into a prompt (message, masked field, Cancel / Authenticate, wrong password shakes it; Enter submits, Esc cancels; takes the keyboard exclusively while open).
 - **Workspace overview** (SUPER+Tab or a 4-finger swipe up/down; global shortcut `quickshell:overview`): a full-screen overlay on the focused monitor, dimmed background, workspaces 1..highest as up to 4 tiles per row, each showing the wallpaper with live window previews (ScreencopyView of each window's toplevel, positioned from Hyprland's window geometry) and app icons. Click a window to focus it, a tile to switch workspace, empty space to close; arrows + Enter pick a workspace, Esc closes. Switching is dispatched 60 ms after closing, because closing hands keyboard focus back to the previous window and Hyprland would jump back to its workspace.
-- **Notification daemon**: popups top right, 5 s or the app's timeout, critical ones stay until clicked; hidden while a tray panel is open.
+- **Notification daemon**: popups top right, 8px below the pills (the toast window ignores the bar's exclusive zone, otherwise it's pushed down another 44px), 5 s or the app's timeout (paused while hovered), critical ones stay until clicked; hidden while a tray panel is open. Hover shows an X in the top right that dismisses it; clicking anywhere else runs the default action and hides the popup (it stays in the control center list).
 
 **IPC** (`qs ipc call <target> <fn>`): `osd brightnessUp|brightnessDown`, `keepAwake set|toggle|get`, `lock lock`, `airdrop toggle|status`. Global shortcuts: `quickshell:launcher`, `quickshell:clipboard`, `quickshell:overview`.
 
@@ -150,10 +156,10 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 ## Changes from default hyprland.lua
 
 - **GPU section** (top of file): sets `AQ_DRM_DEVICES` to the 5070 Ti when it's bound to nvidia, otherwise the iGPU (with `LIBVA_DRIVER_NAME=radeonsi`, `__GLX_VENDOR_LIBRARY_NAME=mesa`) (Win11 VM has the card). Works with the libvirt hook `/etc/libvirt/hooks/qemu`. Only read at login.
-- **Monitor** (ASUS XG27ACDMS): 2560x1440@279.96, scale 1. 10-bit HDR on both GPUs. SDR tuned with `sdr_eotf = gamma22`, `sdrbrightness = 3.40`, `sdrsaturation = 1.10`. Other monitors use the default catch-all rule.
+- **Monitor** (ASUS XG27ACDMS): 2560x1440@279.96, scale 1. 10-bit HDR. On the 5070 Ti, 10-bit buffers fail to allocate and Hyprland aborts (noted in hyprland.lua, not yet handled there). SDR tuned with `sdr_eotf = gamma22`, `sdrbrightness = 3.40`, `sdrsaturation = 1.10`. Other monitors use the default catch-all rule. HDR video needs a player that speaks Wayland color management: mpv (see `mpv/mpv.conf`); VLC 3 tonemaps to SDR and looks washed out. Zen can't show HDR: turning on `gfx.color_management.hdr` broke rendering (grey tiles, washed-out UI), so set it to `false` in the Zen profile's `user.js`.
 - **Input** (restored from old config): flat mouse accel, sensitivity -0.25, key repeat 250 ms delay / 35 per s, numlock on, `off_window_axis_events = 2`. Touchpad: natural scroll, disable while typing, clickfinger, scroll factor 0.7.
 - **Gaps:** `gaps_out = 10`, `gaps_in = 5` (10px between windows), matching the top bar: pills sit 10px from the screen edges and 10px apart, the bar reserves 44px (pill bottom), so windows start 10px below it.
-- **Decoration** (restored from old config): rounding 18 / power 2.5, 1px borders `rgba(47474777)` active / `rgba(1b1b1b33)` inactive, inactive dim 0.05 (special 0.2), shadow (range 26, offset 0 3, render power 2, `rgba(000000b0)`), heavy blur (size 10, 3 passes, xray, noise 0.05, vibrancy 0.5).
+- **Decoration** (restored from old config): rounding 18 / power 2.5, 1px borders `rgba(47474777)` active / `rgba(1b1b1b33)` inactive, inactive dim 0.05 (special 0.2), shadow matching the bar pills (range 26, offset 0 3, render_power 2, `rgba(000000b0)`), heavy blur (size 10, 3 passes, xray, noise 0.05, vibrancy 0.5).
 - **Animations:** stock default curves, every speed multiplied by `anim_scale = 0.6` (lower = faster), except window and workspace animations, restored from the old config at their original speeds: windows pop in 80% / out 90% with `emphasizedDecel` (3 / 2), windows move by sliding, workspaces slide (`menu_decel`, 7), special workspace slides vertically.
 - **Touchpad gestures** (from the old config): 3 fingers swipe = drag window, 3-finger pinch = fullscreen, 4 fingers horizontal = switch workspace (swipe distance 700, cancel ratio 0.2, creates new workspaces). 4 fingers up/down = toggle the Quickshell overview.
 - **Programs:** terminal `kitty`, file manager `nautilus`, browser `/opt/zen/zen`.
@@ -168,8 +174,7 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 |---|---|
 | `/etc/libvirt/hooks/qemu` | Only for the `win11` VM. Before it starts: stops GDM (detaching a card that's still open hangs), kills anything still holding the 5070 Ti, unmounts the ROCKET NVMe (`/mnt/rocket`, passed to the VM as a raw disk; NTFS mounted on both sides corrupts). Once started: GDM back on (iGPU only, login on HDMI), a `systemd-inhibit` unit blocks sleep while the VM runs, re-triggers the Quest's USB device. After it ends: GDM, uninhibit, remount ROCKET |
 | `/etc/udev/rules.d/70-quest-vm.rules` | Quest 3S on USB port 2-1 (the CPU's USB-C port): runs `/usr/local/bin/win11-quest-attach` on every (re)connect to hand it to the win11 VM |
-| `/etc/systemd/system/sunshine-eth-route.service` | Oneshot at boot: runs `/usr/local/bin/sunshine-eth-route.sh` to force Sunshine traffic over Ethernet |
-| `/usr/local/bin/` | `win11-quest-attach`, `sunshine-eth-route.sh` (above), `zen` -> `/opt/zen/zen`, `SGDBoop` (SteamGridDB helper) |
+| `/usr/local/bin/` | `win11-quest-attach`, `zen` -> `/opt/zen/zen`, `SGDBoop` (SteamGridDB helper) |
 | `/etc/modprobe.d/amd-sev.conf`, `kvm-amd.conf` | KVM options for the VM |
 | `/etc/pacman.conf` | Extra `[net-merge]` repository (for `net-merge`), signing key pinned by fingerprint |
 | GDM | T1 only (`--desktop`): display manager, enabled because the libvirt hook stops and restarts it. Pulls in gnome-shell/mutter as its greeter |
@@ -185,6 +190,7 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 | kitty | pacman | Terminal |
 | fish, starship, eza | pacman | Shell, prompt, `ls` |
 | nautilus | pacman | File manager; also the file chooser omdrop opens |
+| mpv | pacman | Video player with HDR passthrough |
 | Zen browser | Release tarball in `/opt/zen` (downloaded by `install.sh`; no package), `/usr/share/applications/zen.desktop` from `system/` | Browser |
 | grim, slurp, jq, libnotify | pacman | Screenshots (+ notification when done) |
 | cliphist 0.7, wl-clipboard 2.3 | pacman | Clipboard history (max 750 entries; skips clipboard content marked sensitive by password managers) |
@@ -208,9 +214,8 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 | 1Password, LocalSend | AUR | Tray apps started at login |
 | net-merge | `[net-merge]` repo | Combines network adapters; tray app |
 | libvirt, qemu-full, virt-manager | pacman | Windows 11 VM with GPU passthrough |
-| sunshine | AUR `sunshine-bin` | Game streaming (user unit) |
 
-`packages/*.txt` are the source of truth for what gets installed; this table explains why. The VM and Sunshine rows (and GDM) are in `packages/desktop.txt`.
+`packages/*.txt` are the source of truth for what gets installed; this table explains why. The VM rows (and GDM) are in `packages/desktop.txt`.
 
 ## Install
 
@@ -219,7 +224,7 @@ Assumes a base Arch install, a user in `wheel` with sudo, and network access. Ru
 ```bash
 git clone https://github.com/StapleTT/T1-dots.git ~/T1-dots
 ~/T1-dots/install.sh             # any machine
-~/T1-dots/install.sh --desktop   # T1: also VM passthrough, Sunshine, GDM
+~/T1-dots/install.sh --desktop   # T1: also VM passthrough, GDM
 ```
 
 Keep the clone where it is: everything in `~` links into it. Safe to re-run; files it would replace are moved to `*.bak`.
@@ -236,7 +241,7 @@ What it does, in order:
 8. If `~/.config/hypr/igpu-card` is missing, points it at the first `/dev/dri/by-path/*-card`. Check it on multi-GPU machines, and create `nvidia-card` there if the GPU section applies; drop the GPU section on machines that don't need it.
 9. Enables NetworkManager and bluetooth, `chsh` to fish, adds you to `i2c`, loads `i2c-dev` at boot, sets gsettings (`adw-gtk3-dark`, `prefer-dark`, `Rubik 11`, `MacOS-Tahoe-Cursor`) through `dbus-run-session` so it works from a TTY.
 10. Clones `~/omdrop-plugin`, runs `omdrop setup` and `omdrop dir ~`.
-11. `--desktop` only: installs everything under `system/` with its file modes, reloads udev, enables `gdm`, `libvirtd`, `sunshine-eth-route` and the Sunshine user unit.
+11. `--desktop` only: installs everything under `system/` with its file modes, reloads udev, enables `gdm` and `libvirtd`.
 
 No display manager by default: reboot, log in on tty1, and fish starts Hyprland.
 
@@ -244,8 +249,8 @@ Still by hand:
 
 - **AirDrop**: `omdrop name T1` on T1 (otherwise the hostname is used), `omdrop doctor` should say "Ready to receive". Copy `~/.omdrop/keys` from the old machine first if Contacts Only senders should keep recognising this computer (never commit them).
 - **ddcutil**: log in again for the `i2c` group, then check `ddcutil detect` sees the monitor.
-- **win11 VM** (T1): `virsh define` an exported domain (`virsh dumpxml win11` on the old machine; `~/win11-backup-with-qxl.xml` is an older copy). `sunshine-eth-route.sh` hardcodes `eno1` and 192.168.1.x addresses.
-- **Wallpapers** other than `27-Golden-Gate.png`, and SGDBoop.
+- **win11 VM** (T1): `virsh define` an exported domain (`virsh dumpxml win11` on the old machine; `~/win11-backup-with-qxl.xml` is an older copy).
+- **Wallpapers** other than the two Golden Gate ones, and SGDBoop.
 
 ## Leftovers from illogical-impulse
 
@@ -265,7 +270,7 @@ On T1 only; a fresh install never has these. Still installed and safe to remove 
 - **Pin Zen through a package** (`zen-browser-bin`), so it updates with the system instead of by hand. Needs `browser` in `hyprland.lua` and `mimeapps.list` pointed at the package's binary and desktop entry.
 - **Split `shell.qml`** if it keeps growing: Quickshell loads sibling `.qml` files as types, the way `AirDrop.qml` already works, so the lock screen, overview, launcher and notifications could each be their own file. Inline components (`Pill`, `Label`, `MenuItem`) would need moving to their own files first, since inline components can't be used from other files.
 - **Keep hyprlock working as the fallback**: it's the only way in if Quickshell's lock breaks; test `hyprlock` from a TTY occasionally.
-- **Before making the repo public**: `sunshine-eth-route.sh` has LAN addresses; the cursor theme is CC BY-NC-ND (verbatim copies with attribution are fine); check the wallpaper's license.
+- **Before making the repo public**: the cursor theme is CC BY-NC-ND (verbatim copies with attribution are fine); check the wallpaper's license.
 
 ## Not set up yet
 

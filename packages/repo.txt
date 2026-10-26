@@ -11,6 +11,7 @@ fish
 starship
 eza
 nautilus
+mpv
 pipewire
 pipewire-pulse
 wireplumber

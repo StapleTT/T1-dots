@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Set up a fresh Arch install with these dotfiles. Safe to re-run.
 #   ./install.sh            packages, dotfiles, services
-#   ./install.sh --desktop  also the T1 desktop extras: Win11 VM passthrough, Sunshine
+#   ./install.sh --desktop  also the T1 desktop extras: Win11 VM passthrough
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")" && pwd)
@@ -104,7 +104,7 @@ step "AirDrop (omdrop)"
 ~/omdrop-plugin/bin/omdrop dir "$HOME"
 
 if $DESKTOP; then
-  step "Desktop extras: VM passthrough, Sunshine"
+  step "Desktop extras: VM passthrough"
   cd "$REPO/system"
   find . -type f -printf '%P\n' | while read -r rel; do
     sudo install -Dm"$(stat -c %a "$rel")" "$rel" "/$rel"
@@ -112,8 +112,7 @@ if $DESKTOP; then
   cd "$REPO"
   sudo udevadm control --reload
   # gdm: the libvirt hook stops and restarts it around GPU handover
-  sudo systemctl enable gdm libvirtd sunshine-eth-route
-  systemctl --user enable app-dev.lizardbyte.app.Sunshine.service
+  sudo systemctl enable gdm libvirtd
   echo "Define the win11 VM yourself: virsh define <exported win11.xml>"
 fi
 
