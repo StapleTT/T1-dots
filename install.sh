@@ -1,13 +1,37 @@
 #!/usr/bin/env bash
 # Set up a fresh Arch install with these dotfiles. Safe to re-run.
-#   ./install.sh            packages, dotfiles, services
-#   ./install.sh --desktop  also the T1 desktop extras: Win11 VM passthrough
+#   ./install.sh                 asks for the install type
+#   ./install.sh --minimal       Hyprland, Quickshell and what the desktop needs; log in on tty1
+#   ./install.sh --desktop       minimal + GDM
+#   ./install.sh --full          desktop + apps: Zen, 1Password, LocalSend, net-merge, mpv
+#   add --vm                     T1 only: Win11 VM passthrough (implies at least --desktop)
 set -euo pipefail
 
 REPO=$(cd "$(dirname "$0")" && pwd)
-DESKTOP=false
-[[ "${1:-}" == --desktop ]] && DESKTOP=true
+TIER="" VM=false
+for arg; do
+  case $arg in
+    --minimal|--desktop|--full) TIER=${arg#--} ;;
+    --vm) VM=true ;;
+    *) echo "Unknown option: $arg"; exit 1 ;;
+  esac
+done
 [[ $EUID -ne 0 ]] || { echo "Run as your user, not root (sudo is used where needed)."; exit 1; }
+
+if [[ -z $TIER ]]; then
+  echo "Install type:"
+  echo "  1) minimal  Hyprland, Quickshell and what the desktop needs; log in on tty1"
+  echo "  2) desktop  minimal + GDM login screen"
+  echo "  3) full     desktop + apps: Zen, 1Password, LocalSend, net-merge, mpv"
+  while [[ -z $TIER ]]; do
+    read -rp "Choose [1-3]: " choice </dev/tty
+    case $choice in 1) TIER=minimal ;; 2) TIER=desktop ;; 3) TIER=full ;; esac
+  done
+fi
+# The libvirt hook stops and restarts GDM around GPU handover
+$VM && [[ $TIER == minimal ]] && TIER=desktop
+# at_least desktop|full: whether the chosen tier includes that one
+at_least() { [[ $1 == desktop && $TIER != minimal ]] || [[ $TIER == full ]]; }
 
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 
@@ -20,8 +44,8 @@ if ! command -v yay >/dev/null; then
   rm -rf "$tmp"
 fi
 
-step "net-merge repository"
-if ! grep -q '^\[net-merge\]' /etc/pacman.conf; then
+if at_least full && ! grep -q '^\[net-merge\]' /etc/pacman.conf; then
+  step "net-merge repository"
   # lsign by pinned fingerprint: fails if the downloaded key isn't the expected one
   curl -fsSL https://rohit267.github.io/net-merge/apt/key.asc | sudo pacman-key --add -
   sudo pacman-key --lsign-key 0168C7AB77721656904811AE904F61E7F4F1C2A1
@@ -29,18 +53,22 @@ if ! grep -q '^\[net-merge\]' /etc/pacman.conf; then
     | sudo tee -a /etc/pacman.conf >/dev/null
 fi
 
-step "Packages"
+step "Packages ($TIER$($VM && echo ' + vm'))"
 lists=("$REPO/packages/repo.txt" "$REPO/packages/aur.txt")
-$DESKTOP && lists+=("$REPO/packages/desktop.txt")
-yay -Syu --needed --noconfirm net-merge $(cat "${lists[@]}")
+at_least desktop && lists+=("$REPO/packages/desktop.txt")
+at_least full && lists+=("$REPO/packages/full.txt")
+$VM && lists+=("$REPO/packages/vm.txt")
+yay -Syu --needed --noconfirm $(cat "${lists[@]}")
 
-step "Zen browser (/opt/zen)"
-if [[ ! -x /opt/zen/zen ]]; then
-  curl -fL https://github.com/zen-browser/desktop/releases/latest/download/zen.linux-x86_64.tar.xz \
-    | sudo tar -xJ -C /opt
+if at_least full; then
+  step "Zen browser (/opt/zen)"
+  if [[ ! -x /opt/zen/zen ]]; then
+    curl -fL https://github.com/zen-browser/desktop/releases/latest/download/zen.linux-x86_64.tar.xz \
+      | sudo tar -xJ -C /opt
+  fi
+  sudo ln -sfn /opt/zen/zen /usr/local/bin/zen
+  sudo install -Dm644 "$REPO/system/usr/share/applications/zen.desktop" /usr/share/applications/zen.desktop
 fi
-sudo ln -sfn /opt/zen/zen /usr/local/bin/zen
-sudo install -Dm644 "$REPO/system/usr/share/applications/zen.desktop" /usr/share/applications/zen.desktop
 
 step "Framework7 icon font"
 f7=~/.local/share/fonts/framework7-icons
@@ -103,17 +131,23 @@ step "AirDrop (omdrop)"
 ~/omdrop-plugin/bin/omdrop setup
 ~/omdrop-plugin/bin/omdrop dir "$HOME"
 
-if $DESKTOP; then
-  step "Desktop extras: VM passthrough"
+at_least desktop && sudo systemctl enable gdm
+
+if $VM; then
+  step "VM passthrough"
   cd "$REPO/system"
-  find . -type f -printf '%P\n' | while read -r rel; do
+  # usr/share/applications is zen.desktop, installed with Zen above
+  find . -type f -not -path './usr/share/applications/*' -printf '%P\n' | while read -r rel; do
     sudo install -Dm"$(stat -c %a "$rel")" "$rel" "/$rel"
   done
   cd "$REPO"
   sudo udevadm control --reload
-  # gdm: the libvirt hook stops and restarts it around GPU handover
-  sudo systemctl enable gdm libvirtd
+  sudo systemctl enable libvirtd
   echo "Define the win11 VM yourself: virsh define <exported win11.xml>"
 fi
 
-step "Done. Reboot and log in on tty1; fish starts Hyprland (conf.d/auto-Hypr.fish)."
+if at_least desktop; then
+  step "Done. Reboot and log in to Hyprland from GDM."
+else
+  step "Done. Reboot and log in on tty1; fish starts Hyprland (conf.d/auto-Hypr.fish)."
+fi

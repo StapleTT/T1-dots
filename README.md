@@ -10,10 +10,12 @@ This repo holds the setup; `install.sh` puts it on a fresh machine (see [Install
 ## Repo layout
 
 ```
-install.sh                 the installer; --desktop adds the T1-only extras
-packages/repo.txt          official-repo packages
-packages/aur.txt           AUR packages
-packages/desktop.txt       T1 only (--desktop): gdm, libvirt, qemu-full, virt-manager
+install.sh                 the installer; asks for minimal / desktop / full, --vm adds the T1-only VM passthrough
+packages/repo.txt          official-repo packages (every install)
+packages/aur.txt           AUR packages (every install)
+packages/desktop.txt       desktop and full: gdm
+packages/full.txt          full only: mpv, 1password, localsend, net-merge
+packages/vm.txt            T1 only (--vm): libvirt, qemu-full, virt-manager
 home/                      mirrors ~; every file is symlinked into place, so edits land in the repo
 system/                    T1-only files under /etc, /usr/local/bin, plus zen.desktop (copied, not linked)
 ```
@@ -65,14 +67,14 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 ├── .omdrop/keys/                       AirDrop identity (private keys; back up, don't publish)
 └── .local/state/quickshell/keep-awake  remembered Keep awake switch
 
-/etc (system, root-owned; all but pacman.conf from system/ with --desktop)
+/etc (system, root-owned; all but pacman.conf from system/ with --vm)
 ├── libvirt/hooks/qemu                  win11 VM: hands over the 5070 Ti and the ROCKET NVMe, restarts GDM
 ├── udev/rules.d/70-quest-vm.rules      passes the Quest headset to the VM
 ├── modprobe.d/amd-sev.conf, kvm-amd.conf
 ├── modules-load.d/i2c-dev.conf         i2c-dev for ddcutil (written by install.sh)
 └── pacman.conf                         extra [net-merge] repository (added by install.sh)
 
-/usr/local/bin                          win11-quest-attach (--desktop), zen -> /opt/zen/zen, SGDBoop (manual)
+/usr/local/bin                          win11-quest-attach (--vm), zen -> /opt/zen/zen (full), SGDBoop (manual)
 ```
 
 ## Config files
@@ -92,12 +94,12 @@ Everything this setup owns, and nothing else. `~/.config` also holds per-app sta
 | `~/.config/kitty/theme.conf` | Monochrome kitty theme: `#1a1a1a` background (translucent; black looked too dark through the glass), `#f2f2f2` text, grey `#3a3a3c` selection, Apple dark-mode ANSI colours; also redefines colours 233–255 that the Starship prompt uses for its segments (stock values would invert them). Replaces the old illogical-impulse generated theme |
 | `~/.config/starship.toml` | Prompt, macOS/Linux hybrid: two lines: `<Arch logo> user@host dir  branch status`, then `%` on its own line for input (macOS Terminal style, no pills); `%` white, red after a failed command; command time (over 2 s) and exit code on the right of the input line; blank line between commands; git status as Nerd Font (Font Awesome) icons with counts: pencil modified, plus staged, ? untracked, arrows ahead/behind, inbox stashed, trash deleted, warning conflicted. Icons from Starship's official Nerd Font Symbols preset (`starship preset nerd-font-symbols`), merged in: OS logos, branch, read-only lock, SSH and exit-code icons; the preset's other modules (languages, cloud, etc.) are appended but not in the prompt's format. Uses the kitty theme's colours. Old pill config saved in the config backup. Fish's transient prompt still collapses old prompts to the `%` |
 | `~/.config/fish/config.fish` | No greeting; `~/.local/bin` on the path; Starship with transient prompt (not on the Linux console); aliases: `clear`/`celar`/`claer` (kitty-safe clear), `pamcan`, `ls` -> `eza --icons=auto`, `ssh` -> `kitten ssh` in kitty. Removed the startup `cat` of illogical-impulse's `sequences.txt`, which re-applied the old palette in every terminal via escape codes |
-| `~/.config/fish/conf.d/auto-Hypr.fish` | In a login shell on tty1 with no display, `exec start-hyprland` (log in `~/.cache/hyprland.log`). This is the normal login: the installer sets up no display manager. On T1, GDM (installed with `--desktop`) takes tty1 instead |
+| `~/.config/fish/conf.d/auto-Hypr.fish` | In a login shell on tty1 with no display, `exec start-hyprland` (log in `~/.cache/hyprland.log`). This is the login for minimal installs; desktop and full installs enable GDM, which takes tty1 instead |
 | `~/.config/gtk-3.0/gtk.css`, `~/.config/gtk-4.0/gtk.css` | App theming to match the bar (replaces the old Matugen output): monochrome palette, window `#121212`, views `#0b0b0b`, cards/dialogs `#1c1c1e`, black header bars and popovers (like the pills), white accent with black text, iOS red/green/yellow for destructive/success/warning. GTK 4 file sets libadwaita's CSS variables and the older named colours. GTK theme stays `adw-gtk3-dark` (gsettings), `color-scheme prefer-dark`, font `Rubik 11` (gsettings `font-name`) |
 | `~/.config/qt6ct/qt6ct.conf`, `~/.local/share/color-schemes/Island.colors` | Qt apps: "Island" colour scheme with the same palette (selected rows grey `#3a3a3c` with white text, like the launcher), Darkly widget style, `breeze-plus-dark` icons, Rubik / JetBrains Mono fonts. Read through `QT_QPA_PLATFORMTHEME=qt6ct` (`qt6ct-kde`, which understands KDE `.colors` files; no Plasma needed). Generated by `install.sh` because it needs the scheme's absolute path; change it with the `qt6ct` GUI or by editing the heredoc in `install.sh` |
 | `~/.config/kdeglobals` | Same palette, style and fonts for KDE apps and libraries that read kdeglobals directly. Previous kdeglobals and darklyrc saved in the config backup |
 | `~/.config/fontconfig/fonts.conf` | Greyscale antialiasing (`rgba none`), no subpixel colour fringes |
-| `~/.config/autostart/` | 1Password, LocalSend, net-merge desktop entries. Hyprland doesn't run XDG autostart; the same three are started from `hyprland.lua` |
+| `~/.config/autostart/` | 1Password, LocalSend, net-merge desktop entries. Hyprland doesn't run XDG autostart; the same three are started from `hyprland.lua` (full installs; on minimal and desktop the apps aren't installed and those lines do nothing) |
 | `~/.config/airdrop/config.toml` | omdrop settings, written by omdrop (not in the repo): device name (defaults to the hostname; T1 uses `T1`), download dir (`install.sh` sets `~`) |
 
 ## Quickshell
@@ -177,7 +179,7 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 | `/usr/local/bin/` | `win11-quest-attach`, `zen` -> `/opt/zen/zen`, `SGDBoop` (SteamGridDB helper) |
 | `/etc/modprobe.d/amd-sev.conf`, `kvm-amd.conf` | KVM options for the VM |
 | `/etc/pacman.conf` | Extra `[net-merge]` repository (for `net-merge`), signing key pinned by fingerprint |
-| GDM | T1 only (`--desktop`): display manager, enabled because the libvirt hook stops and restarts it. Pulls in gnome-shell/mutter as its greeter |
+| GDM | Desktop and full installs (also forced by `--vm`, because the libvirt hook stops and restarts it): display manager. Pulls in gnome-shell/mutter as its greeter |
 
 ## Installed / used
 
@@ -191,7 +193,7 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 | fish, starship, eza | pacman | Shell, prompt, `ls` |
 | nautilus | pacman | File manager; also the file chooser omdrop opens |
 | mpv | pacman | Video player with HDR passthrough |
-| Zen browser | Release tarball in `/opt/zen` (downloaded by `install.sh`; no package), `/usr/share/applications/zen.desktop` from `system/` | Browser |
+| Zen browser | Full installs: release tarball in `/opt/zen` (downloaded by `install.sh`; no package), `/usr/share/applications/zen.desktop` from `system/` | Browser |
 | grim, slurp, jq, libnotify | pacman | Screenshots (+ notification when done) |
 | cliphist 0.7, wl-clipboard 2.3 | pacman | Clipboard history (max 750 entries; skips clipboard content marked sensitive by password managers) |
 | pipewire, wireplumber (`wpctl`), playerctl | pacman | Audio; default media/volume keys (volume in 2% steps, max 100%) |
@@ -211,11 +213,11 @@ AirDrop with iPhones, iPads and Macs, from the [omdrop plugin](https://github.co
 | omdrop-owl 0.3.0 | AUR | AirDrop radio backend |
 | omdrop plugin | git clone `~/omdrop-plugin` | AirDrop CLI and receiver |
 | python-libarchive-c, keyutils | pacman | omdrop receiver |
-| 1Password, LocalSend | AUR | Tray apps started at login |
+| 1Password, LocalSend | AUR (full) | Tray apps started at login |
 | net-merge | `[net-merge]` repo | Combines network adapters; tray app |
 | libvirt, qemu-full, virt-manager | pacman | Windows 11 VM with GPU passthrough |
 
-`packages/*.txt` are the source of truth for what gets installed; this table explains why. The VM rows (and GDM) are in `packages/desktop.txt`.
+`packages/*.txt` are the source of truth for what gets installed; this table explains why. GDM is in `packages/desktop.txt`; mpv, 1Password, LocalSend and net-merge in `packages/full.txt`; the VM rows in `packages/vm.txt`.
 
 ## Install
 
@@ -223,27 +225,35 @@ Assumes a base Arch install, a user in `wheel` with sudo, and network access. Ru
 
 ```bash
 git clone https://github.com/StapleTT/T1-dots.git ~/T1-dots
-~/T1-dots/install.sh             # any machine
-~/T1-dots/install.sh --desktop   # T1: also VM passthrough, GDM
+~/T1-dots/install.sh             # asks for the install type
+~/T1-dots/install.sh --full --vm # T1
 ```
+
+Install types (each includes the one before it; pass `--minimal`, `--desktop` or `--full` to skip the question):
+
+- **minimal**: Hyprland, Quickshell and what the desktop needs (terminal, file manager, audio, network, Bluetooth, AirDrop, fonts and themes). No display manager: log in on tty1 and fish starts Hyprland.
+- **desktop**: minimal + GDM.
+- **full**: desktop + apps: Zen, 1Password, LocalSend, net-merge, mpv.
+- **`--vm`** (T1 only, with any type): Win11 VM passthrough; raises minimal to desktop, since the libvirt hook restarts GDM.
 
 Keep the clone where it is: everything in `~` links into it. Safe to re-run; files it would replace are moved to `*.bak`.
 
 What it does, in order:
 
 1. `base-devel`, then `yay` (from `yay-bin`) if missing.
-2. Adds the `[net-merge]` repository to `/etc/pacman.conf`, importing its key and signing it by fingerprint `0168C7AB77721656904811AE904F61E7F4F1C2A1` (aborts if the downloaded key doesn't match).
-3. `yay -Syu --needed` over `packages/repo.txt`, `packages/aur.txt`, `net-merge` (and `packages/desktop.txt` with `--desktop`).
-4. Zen release tarball into `/opt/zen` if missing, `/usr/local/bin/zen` link, `zen.desktop`.
+2. Full only: adds the `[net-merge]` repository to `/etc/pacman.conf`, importing its key and signing it by fingerprint `0168C7AB77721656904811AE904F61E7F4F1C2A1` (aborts if the downloaded key doesn't match).
+3. `yay -Syu --needed` over `packages/repo.txt` and `packages/aur.txt`, plus `desktop.txt` (desktop, full), `full.txt` (full) and `vm.txt` (`--vm`).
+4. Full only: Zen release tarball into `/opt/zen` if missing, `/usr/local/bin/zen` link, `zen.desktop`.
 5. Framework7 Icons 5.0.5 (+ LICENSE) into `~/.local/share/fonts/framework7-icons/`.
 6. Symlinks every file under `home/` into `~`, then `fc-cache -f`.
 7. Writes `~/.config/qt6ct/qt6ct.conf`.
 8. If `~/.config/hypr/igpu-card` is missing, points it at the first `/dev/dri/by-path/*-card`. Check it on multi-GPU machines, and create `nvidia-card` there if the GPU section applies; drop the GPU section on machines that don't need it.
 9. Enables NetworkManager and bluetooth, `chsh` to fish, adds you to `i2c`, loads `i2c-dev` at boot, sets gsettings (`adw-gtk3-dark`, `prefer-dark`, `Rubik 11`, `MacOS-Tahoe-Cursor`) through `dbus-run-session` so it works from a TTY.
 10. Clones `~/omdrop-plugin`, runs `omdrop setup` and `omdrop dir ~`.
-11. `--desktop` only: installs everything under `system/` with its file modes, reloads udev, enables `gdm` and `libvirtd`.
+11. Desktop and full: enables `gdm`.
+12. `--vm` only: installs everything under `system/` (except `zen.desktop`) with its file modes, reloads udev, enables `libvirtd`.
 
-No display manager by default: reboot, log in on tty1, and fish starts Hyprland.
+Then reboot: log in on tty1 (minimal; fish starts Hyprland) or from GDM.
 
 Still by hand:
 

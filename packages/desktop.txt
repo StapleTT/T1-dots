@@ -1,4 +1,1 @@
 gdm
-libvirt
-qemu-full
-virt-manager

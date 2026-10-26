@@ -1,7 +1,5 @@
 ttf-rubik-vf
 darkly-bin
 omdrop-owl
-1password
-localsend
 qt6ct-kde
 breeze-plus

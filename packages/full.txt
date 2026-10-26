@@ -1,0 +1,4 @@
+mpv
+1password
+localsend
+net-merge
