@@ -94,6 +94,9 @@ hl.on("hyprland.start", function ()
 	hl.exec_cmd("/opt/1Password/1password --silent")
 	hl.exec_cmd("/usr/lib/localsend/localsend_app --hidden")
 	hl.exec_cmd("/usr/bin/net-merge tray")
+
+	-- Sunshine: graphical-session.target never activates under GDM + start-hyprland, so start it here
+	hl.exec_cmd("systemctl --user start app-dev.lizardbyte.app.Sunshine.service")
 end)
 
 -------------------------------
@@ -106,8 +109,8 @@ hl.env("XCURSOR_THEME", "MacOS-Tahoe-Cursor")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
--- Qt apps follow ~/.config/qt6ct/qt6ct.conf ("Island" colour scheme, Darkly style, Rubik), like GTK follows gtk.css
-hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
+-- Qt apps follow ~/.config/kdeglobals ("Island" colour scheme, Darkly style, Rubik), like GTK follows gtk.css
+hl.env("QT_QPA_PLATFORMTHEME", "kde")
 hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 
 -----------------------
@@ -135,14 +138,14 @@ hl.env("QT_QPA_PLATFORM", "wayland;xcb")
 -- Refer to https://wiki.hypr.land/Configuring/Basics/Variables/
 hl.config({
 	general = {
-		gaps_in = 5,
-		gaps_out = 10, -- matches the top bar: 10px from the screen edge and between pills and windows
+		gaps_in = 3,
+		gaps_out = 6, -- boxy setup: flush 30px bar, 6px between windows and the bar/screen edges
 
 		border_size = 1,
 
 		col = {
-			active_border = "rgba(47474777)",
-			inactive_border = "rgba(1b1b1b33)",
+			active_border = "rgba(8a8a8aff)",
+			inactive_border = "rgba(2e2e2eff)",
 		},
 
 		-- Set to true to enable resizing windows by clicking and dragging on borders and gaps
@@ -155,8 +158,7 @@ hl.config({
 	},
 
 	decoration = {
-		rounding = 18,
-		rounding_power = 2.5,
+		rounding = 0,
 
 		-- Change transparency of focused and unfocused windows
 		active_opacity = 1.0,
@@ -168,7 +170,7 @@ hl.config({
 		dim_special = 0.2,
 
 		shadow = {
-			enabled = true,
+			enabled = false,
 			range = 26,
 			offset = { 0, 3 },
 			render_power = 2,
@@ -183,7 +185,8 @@ hl.config({
 			size = 10,
 			passes = 3,
 			brightness = 1,
-			noise = 0.05,
+			noise = 0.0117, -- default, just dithering: Hyprland's noise lands on the downscaled blur as soft blobs; the grain
+			-- on glass comes from tiles in kitty and Quickshell (~/.config/quickshell/make-grain.py)
 			contrast = 0.89,
 			vibrancy = 0.5,
 			vibrancy_darkness = 0.5,
@@ -364,6 +367,7 @@ hl.bind(mainMod .. " + Space", hl.dsp.global("quickshell:launcher"))
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.global("quickshell:clipboard"))
 hl.bind(mainMod .. " + Tab", hl.dsp.global("quickshell:overview"))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
+hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle" }))
 hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit")) -- dwindle only
 
 -- Move focus with mainMod + arrow keys
@@ -400,6 +404,9 @@ hl.bind("SHIFT + Print", hl.dsp.exec_cmd(screenshot .. " screen"))
 hl.bind("ALT + Print", hl.dsp.exec_cmd(screenshot .. " window"))
 hl.bind("CTRL + SHIFT + Print", hl.dsp.exec_cmd(screenshot .. " screen save"))
 hl.bind("CTRL + ALT + Print", hl.dsp.exec_cmd(screenshot .. " window save"))
+
+-- SUPER+SHIFT+T: pick a new wallpaper (scripts/wallpaper.sh: file picker, fills the screen, saved to hyprpaper.conf)
+hl.bind(mainMod .. " + SHIFT + T", hl.dsp.exec_cmd(os.getenv("HOME") .. "/.config/hypr/scripts/wallpaper.sh"))
 
 -- Laptop multimedia keys for volume and LCD brightness
 hl.bind(
@@ -471,6 +478,24 @@ hl.window_rule({
 --     no_anim = true,
 -- })
 -- overlayLayerRule:set_enabled(false)
+
+-- Quickshell glass: blur behind the bar's panels and morphs and the notifications (glass is 72% opaque). ignore_alpha
+-- 0.6 blurs only the glass: the launcher's drop shadow (at most 50% opaque) and the transparent rest of the surface
+-- stay unblurred, otherwise the shadow shows as a hard-edged pill of blur. Not the overview (its dimming would blur
+-- the whole screen)
+hl.layer_rule({
+	name = "quickshell-glass-blur",
+	match = { namespace = "^quickshell(-toasts)?$" },
+	blur = true,
+	ignore_alpha = 0.6,
+})
+-- Desktop widgets are more see-through (40% opaque), so a lower threshold
+hl.layer_rule({
+	name = "quickshell-desktop-blur",
+	match = { namespace = "^quickshell:desktop$" },
+	blur = true,
+	ignore_alpha = 0.2,
+})
 
 -- Hyprland-run windowrule
 hl.window_rule({

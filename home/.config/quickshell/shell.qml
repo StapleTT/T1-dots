@@ -17,32 +17,60 @@ import Quickshell.Widgets
 ShellRoot {
     id: root
 
+    // ---- Look: monochrome, square boxes with 1px borders, monospace everywhere ----
+
+    readonly property string mono: "JetBrainsMono Nerd Font"
+    readonly property int barH: 30 // the bar is a flat strip across the top
+    // The bar: translucent dark grey glass with grain. Must stay over 60% opaque for the layer rule to blur behind it
+    readonly property color bg: "#c4161616" // ~77% opaque: dark grey even over bright wallpapers
+    readonly property color edge: "#3a3a3a" // box borders
+    readonly property color dim: "#80ffffff" // secondary text
+    readonly property color accent: "white" // active workspace underline
+    readonly property color glass: "#b80f0f0f" // floating boxes (panels, toasts, morphs); blurred behind by a layer rule
+    // that only blurs pixels over 60% opaque, so keep this above that
+    readonly property color glassLight: "#66141414" // desktop widgets, more see-through
+    // Noise inside glass boxes: grain.png's opacity (its pixels average ~35% alpha). kitty tiles the same noise with this
+    // strength baked in; both tiles come from make-grain.py, so change it there and rerun
+    readonly property real boxGrain: 0.05
+
+    // Nerd Font glyphs (in JetBrainsMono Nerd Font), by role
+    readonly property var nf: {
+        const g = {
+            restart: 0xf021, ethernet: 0xf0200, prev: 0xf048, next: 0xf051, play: 0xf04b, pause: 0xf04c,
+            check: 0xf00c, checkBox: 0xf14a, box: 0xf096, radioOn: 0xf192, radioOff: 0xf10c, left: 0xf053, right: 0xf054,
+            phone: 0xf10b, clipboard: 0xf0ea, file: 0xf15c, alert: 0xf06a, folder: 0xf07b, gamepad: 0xf11b,
+            terminal: 0xf120, headphones: 0xf025, keyboard: 0xf11c, lock: 0xf023, moon: 0xf186, music: 0xf001,
+            send: 0xf1d8, user: 0xf2bd, image: 0xf03e, power: 0xf011, search: 0xf002, sliders: 0xf1de,
+            volMute: 0xf0581, volLow: 0xf057f, volMid: 0xf0580, volHigh: 0xf057e, logout: 0xf08b,
+            sunLow: 0xf00df, sunHigh: 0xf00e0, timer: 0xf017, wifi: 0xf05a9, wifiOff: 0xf05aa, wifiAlert: 0xf092b,
+            close: 0xf00d, cpu: 0xf4bc, memory: 0xf035b, disk: 0xf02ca, gpu: 0xf2db, temp: 0xf2c9, down: 0xf019, up: 0xf093,
+            bell: 0xf0f3, bellOff: 0xf1f6, bluetooth: 0xf293, package: 0xf03d7, calendar: 0xf073, nightLight: 0xf0594
+        };
+        for (const k in g) g[k] = String.fromCodePoint(g[k]);
+        return g;
+    }
+
     // Shared spring for all motion. Behaviors retarget it mid-flight keeping its velocity, so interrupted
     // animations carry their momentum instead of restarting. ~2.5% overshoot
     component Motion: SpringAnimation { spring: 5.5; damping: 0.4; epsilon: 0.5 }
 
-    // Black rounded "island" with a shadow; children are laid out in a row.
-    component Pill: Rectangle {
+    // A section of the bar strip; children are laid out in a row
+    component Pill: Item {
         default property alias content: row.data
         property alias spacing: row.spacing
-        y: 10
-        height: 34
-        width: row.implicitWidth + 28
-        radius: height / 2
-        color: "black"
+        height: root.barH
+        width: row.implicitWidth + 20
 
         Behavior on width { Motion {} }
-
-        layer.enabled: true
-        layer.effect: Shadow {}
 
         RowLayout {
             id: row
             anchors.centerIn: parent
-            spacing: 12
+            spacing: 10
         }
     }
 
+    // For text drawn straight on the wallpaper (lock screen)
     component Shadow: MultiEffect {
         shadowEnabled: true
         shadowColor: "#b0000000"
@@ -52,25 +80,32 @@ ShellRoot {
 
     component Label: Text {
         color: "white"
-        font { family: "Rubik"; pixelSize: 13 }
+        font { family: root.mono; pixelSize: 12 }
     }
 
+    // Small caps-style section heading: "NETWORK"
+    component Header: Label {
+        color: "#d9ffffff"
+        font { pixelSize: 11; bold: true; letterSpacing: 1 }
+    }
+
+    // Text is a glyph from root.nf
     component Icon: Text {
         color: "white"
-        font { family: "Framework7 Icons"; pixelSize: 17 } // iOS / SF Symbols style, MIT; text is the icon name
+        font { family: root.mono; pixelSize: 15 }
     }
 
     // Icon that reacts to clicks
     component IconButton: Icon {
         signal clicked()
         property bool closesPanel: true // set false on buttons that open a dropdown themselves
-        opacity: area.containsMouse ? 0.7 : 1
+        opacity: area.containsMouse ? 0.6 : 1
         MouseArea {
             id: area
-            // At least 28px square around the icon, so small icons (the tray chevron) are easy to hit
+            // At least 26px square around the icon, so small icons (the tray chevron) are easy to hit
             anchors.centerIn: parent
-            width: Math.max(parent.width + 8, 28)
-            height: Math.max(parent.height + 8, 28)
+            width: Math.max(parent.width + 8, 26)
+            height: Math.max(parent.height + 8, 26)
             hoverEnabled: true
             onClicked: {
                 if (parent.closesPanel) root.panel = "";
@@ -79,22 +114,136 @@ ShellRoot {
         }
     }
 
-    // On/off switch; display only, the row or a MouseArea inside it handles clicks
-    component Toggle: Rectangle {
+    // On/off: a small square, filled when on. Display only, the row or a MouseArea inside it handles clicks
+    component Toggle: Item {
         property bool checked: false
-        implicitWidth: 34
+        implicitWidth: 26
         implicitHeight: 20
-        radius: 10
-        color: checked ? "white" : "#33ffffff"
-        Behavior on color { ColorAnimation { duration: 150 } }
         Rectangle {
-            width: 16
-            height: 16
-            radius: 8
-            y: 2
-            x: parent.checked ? parent.width - width - 2 : 2
-            color: parent.checked ? "black" : "white"
-            Behavior on x { Motion { spring: 6; damping: 0.46; epsilon: 0.25 } }
+            anchors.centerIn: parent
+            width: 9
+            height: 9
+            color: parent.checked ? "white" : "transparent"
+            border.width: 1
+            border.color: parent.checked ? "white" : root.dim
+            Behavior on color { ColorAnimation { duration: 100 } }
+        }
+    }
+
+    // Level as a row of tick marks: ||||||||||||····
+    component Ticks: Item {
+        id: ticks
+        property real level: 0 // 0..1
+        property bool muted: false
+        property int pitch: 5 // px per tick; sliders use sparser ticks
+        property bool handle: false // taller tick at the level, for sliders
+        readonly property int count: Math.max(1, Math.floor((width + pitch - 2) / pitch))
+        implicitHeight: 12
+        Rectangle {
+            visible: ticks.handle
+            x: Math.max(0, Math.min(1, ticks.level)) * (ticks.width - width)
+            y: -2
+            width: 3
+            height: ticks.height + 4
+            color: "white"
+        }
+        Repeater {
+            model: ticks.count
+            Rectangle {
+                required property int index
+                x: index * ticks.pitch
+                width: 2
+                height: ticks.height
+                color: index < Math.round(Math.max(0, Math.min(1, ticks.level)) * ticks.count)
+                    ? (ticks.muted ? "#66ffffff" : "white") : "#26ffffff"
+            }
+        }
+    }
+
+    // Corner brackets just outside a box
+    component Corners: Item {
+        anchors.fill: parent
+        anchors.margins: -6
+        Repeater {
+            model: 4
+            Item {
+                id: corner
+                required property int index
+                width: 14
+                height: 14
+                x: index % 2 ? parent.width - width : 0
+                y: index > 1 ? parent.height - height : 0
+                Rectangle { width: 14; height: 1; y: corner.index > 1 ? 13 : 0; color: "#bfffffff" }
+                Rectangle { width: 1; height: 14; x: corner.index % 2 ? 13 : 0; color: "#bfffffff" }
+            }
+        }
+    }
+
+    // Light noise inside a glass box (Hyprland's blur noise is applied to the downscaled blur, so it comes out as soft
+    // blobs, not grain); first child of the box
+    component Grain: Image {
+        anchors.fill: parent
+        anchors.margins: 1 // inside the border
+        source: "grain.png"
+        fillMode: Image.Tile
+        smooth: false
+        opacity: root.boxGrain
+    }
+
+    // Small boxed label sitting on a frame's border: CONTROL, MONOCHROME
+    component Tag: Rectangle {
+        property alias text: tagText.text
+        width: tagText.implicitWidth + 12
+        height: tagText.implicitHeight + 2
+        color: "#1c1c1c"
+        border.width: 1
+        border.color: "#4d4d4d"
+        Label {
+            id: tagText
+            anchors.centerIn: parent
+            color: "#bfffffff"
+            font { pixelSize: 9; bold: true; letterSpacing: 1 }
+        }
+    }
+
+    // Control center tile: icon, LABEL and status, square switch top right (or centred in a compact tile).
+    // Stacked tiles put the icon above the label, which sits at the bottom
+    component CcTile: Rectangle {
+        id: tile
+        property string icon: ""
+        property string iconSource: ""
+        property string label
+        property string sub: ""
+        property bool checked: false
+        property bool hasToggle: true
+        property bool stacked: false
+        signal toggled()
+        signal clicked()
+        Layout.fillWidth: true
+        implicitHeight: stacked ? 74 : 54
+        color: tileArea.containsMouse ? "#12ffffff" : "transparent"
+        MouseArea { id: tileArea; anchors.fill: parent; hoverEnabled: true; onClicked: tile.clicked() }
+        Item {
+            x: 10
+            y: tile.stacked ? 12 : (tile.height - height) / 2
+            width: 20
+            height: 20
+            Icon { anchors.centerIn: parent; text: tile.icon; visible: tile.iconSource === ""; font.pixelSize: 15 }
+            Image { anchors.centerIn: parent; source: tile.iconSource; sourceSize: Qt.size(15, 15); visible: tile.iconSource !== "" }
+        }
+        Column {
+            x: tile.stacked ? 10 : 40
+            y: tile.stacked ? tile.height - height - 10 : (tile.height - height) / 2
+            spacing: 2
+            Header { text: tile.label; font.pixelSize: 10 }
+            Label { text: tile.sub; color: root.dim; font.pixelSize: 9; visible: text !== "" }
+        }
+        Toggle {
+            visible: tile.hasToggle
+            checked: tile.checked
+            anchors.right: parent.right
+            y: tile.stacked ? 8 : (tile.height - height) / 2
+            MouseArea { anchors.fill: parent; anchors.margins: -4; onClicked: tile.toggled() }
         }
     }
 
@@ -106,16 +255,15 @@ ShellRoot {
         signal clicked()
         Layout.fillWidth: true
         implicitWidth: itemRow.implicitWidth + 20 // for the tray menu card, which sizes to its rows
-        implicitHeight: 34
-        radius: 10
-        color: itemArea.containsMouse ? "#22ffffff" : "transparent"
+        implicitHeight: 30
+        color: itemArea.containsMouse ? "#1fffffff" : "transparent"
         RowLayout {
             id: itemRow
             anchors.fill: parent
             anchors.leftMargin: 10
             spacing: 10
             Icon { text: parent.parent.icon; visible: parent.parent.iconSource === ""; Layout.preferredWidth: 20; horizontalAlignment: Text.AlignHCenter }
-            Image { source: parent.parent.iconSource; sourceSize: Qt.size(17, 17); visible: parent.parent.iconSource !== ""; Layout.preferredWidth: 20; fillMode: Image.Pad }
+            Image { source: parent.parent.iconSource; sourceSize: Qt.size(15, 15); visible: parent.parent.iconSource !== ""; Layout.preferredWidth: 20; fillMode: Image.Pad }
             Label { text: parent.parent.label; Layout.fillWidth: true }
         }
         MouseArea {
@@ -123,6 +271,210 @@ ShellRoot {
             anchors.fill: parent
             hoverEnabled: true
             onClicked: parent.clicked()
+        }
+    }
+
+    // System monitor: CPU, memory, GPU meters, then storage, network and temperatures.
+    // Used by the system panel and the desktop widget
+    component SystemView: ColumnLayout {
+        id: sysView
+        property bool active: true // builds the lists only while shown
+        spacing: 12
+
+        Repeater {
+            model: !sysView.active ? [] : [
+                { icon: root.nf.cpu, name: "CPU", level: root.cpu, detail: [root.cpuModel.replace(/\s*\d+-Core Processor$/, ""),
+                    ...root.temps.filter(t => t.name === "cpu").map(t => `${t.temp}°C`)].filter(d => d !== "").join("  ·  ") },
+                { icon: root.nf.memory, name: "RAM", level: root.mem.used / root.mem.total,
+                    detail: `${root.gib(root.mem.used)} / ${root.gib(root.mem.total)} GB used  ·  swap ${root.gib(root.mem.swapUsed)} / ${root.gib(root.mem.swapTotal)} GB` },
+                ...(root.gpu ? [{ icon: root.nf.gpu, name: "GPU", level: root.gpu.util,
+                    detail: `${root.gpu.name}  ·  VRAM ${(root.gpu.memUsed / 1024).toFixed(1)} / ${(root.gpu.memTotal / 1024).toFixed(1)} GB  ·  ${root.gpu.temp}°C` }] : [])
+            ]
+
+            ColumnLayout {
+                id: meter
+                required property var modelData
+                Layout.fillWidth: true
+                spacing: 4
+                RowLayout {
+                    spacing: 8
+                    Icon { text: meter.modelData.icon; font.pixelSize: 13 }
+                    Header { text: meter.modelData.name; Layout.fillWidth: true }
+                    Label { text: `${Math.round(meter.modelData.level * 100)}%`; font { pixelSize: 14; bold: true } }
+                }
+                Ticks { Layout.fillWidth: true; level: meter.modelData.level }
+                Label { text: meter.modelData.detail; color: root.dim; font.pixelSize: 10; elide: Text.ElideRight; Layout.fillWidth: true }
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            RowLayout {
+                spacing: 8
+                Icon { text: root.nf.disk; font.pixelSize: 13 }
+                Header { text: "STORAGE"; Layout.fillWidth: true }
+                Label { text: `${root.mounts.length} mounts`; color: root.dim; font.pixelSize: 10 }
+            }
+            Repeater {
+                model: sysView.active ? root.mounts : []
+                ColumnLayout {
+                    id: mount
+                    required property var modelData
+                    readonly property real share: modelData.used / Math.max(modelData.size, 1)
+                    Layout.fillWidth: true
+                    spacing: 3
+                    RowLayout {
+                        Label { text: mount.modelData.target; Layout.fillWidth: true; elide: Text.ElideRight }
+                        Label {
+                            text: `${Math.round(mount.share * 100)}%  ·  ${root.bytes(mount.modelData.used)} / ${root.bytes(mount.modelData.size)}`
+                            color: root.dim
+                            font.pixelSize: 10
+                        }
+                    }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        implicitHeight: 2
+                        color: "#26ffffff"
+                        Rectangle { width: parent.width * mount.share; height: parent.height; color: mount.share > 0.9 ? "#ff6961" : "white" }
+                    }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 16
+            ColumnLayout {
+                Layout.alignment: Qt.AlignTop
+                spacing: 4
+                RowLayout { spacing: 8; Icon { text: root.nf.wifi; font.pixelSize: 13 } Header { text: "NETWORK" } }
+                Label { text: `${root.nf.down} ${root.bytes(root.net.rxRate)}/s`; color: root.dim; font.pixelSize: 11 }
+                Label { text: `${root.nf.up} ${root.bytes(root.net.txRate)}/s`; color: root.dim; font.pixelSize: 11 }
+                Label { text: root.net.dev; color: root.dim; font.pixelSize: 10 }
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                Layout.alignment: Qt.AlignTop
+                spacing: 4
+                RowLayout { spacing: 8; Icon { text: root.nf.temp; font.pixelSize: 13 } Header { text: "TEMPS" } }
+                Flow {
+                    Layout.fillWidth: true
+                    spacing: 4
+                    Repeater {
+                        model: sysView.active ? root.temps : []
+                        Rectangle {
+                            required property var modelData
+                            width: chip.implicitWidth + 10
+                            height: chip.implicitHeight + 4
+                            color: "transparent"
+                            border.width: 1
+                            border.color: "#2e2e2e"
+                            Label { id: chip; anchors.centerIn: parent; text: `${parent.modelData.name} ${parent.modelData.temp}°`; color: "#bfffffff"; font.pixelSize: 10 }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: 28
+            color: btopArea.containsMouse ? "#1fffffff" : "transparent"
+            border.width: 1
+            border.color: root.edge
+            Label { anchors.centerIn: parent; text: `${root.nf.terminal}  open btop` }
+            MouseArea {
+                id: btopArea
+                anchors.fill: parent
+                hoverEnabled: true
+                onClicked: { root.panel = ""; Quickshell.execDetached(["kitty", "btop"]); }
+            }
+        }
+    }
+
+
+    // Month calendar: title with previous / next, week day initials, six weeks. Today is a white square, marked days
+    // (root.marks) are underlined; when pickable, clicking a day picks it (outlined)
+    component MonthGrid: ColumnLayout {
+        id: month
+        property int offset: 0 // months away from the current one
+        property bool pickable: false
+        property date picked: clock.date
+        readonly property date shown: new Date(clock.date.getFullYear(), clock.date.getMonth() + offset, 1)
+        // First cell: the week day the locale starts weeks on, on or before the 1st
+        readonly property int lead: (shown.getDay() - Qt.locale().firstDayOfWeek % 7 + 7) % 7
+        spacing: 4
+
+        RowLayout {
+            Layout.fillWidth: true
+            Label {
+                Layout.fillWidth: true
+                Layout.leftMargin: 6
+                text: Qt.formatDate(month.shown, "MMMM yyyy").toUpperCase()
+                font { bold: true; letterSpacing: 1 }
+            }
+            IconButton { text: root.nf.left; font.pixelSize: 13; closesPanel: false; onClicked: month.offset-- }
+            IconButton { text: root.nf.right; font.pixelSize: 13; closesPanel: false; onClicked: month.offset++ }
+        }
+
+        Grid {
+            columns: 7
+            Repeater {
+                model: 7
+                Label {
+                    required property int index
+                    width: 36
+                    height: 24
+                    horizontalAlignment: Text.AlignHCenter
+                    verticalAlignment: Text.AlignVCenter
+                    text: Qt.locale().dayName((Qt.locale().firstDayOfWeek + index) % 7, Locale.NarrowFormat)
+                    color: root.dim
+                    font.pixelSize: 11
+                }
+            }
+            Repeater {
+                model: 42
+                Item {
+                    id: cell
+                    required property int index
+                    readonly property date day: new Date(month.shown.getFullYear(), month.shown.getMonth(), index - month.lead + 1)
+                    readonly property bool inMonth: day.getMonth() === month.shown.getMonth()
+                    readonly property bool today: day.toDateString() === clock.date.toDateString()
+                    readonly property bool marked: root.marks.includes(root.dayKey(day))
+                    width: 36
+                    height: 32
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: 28
+                        height: 24
+                        color: cell.today ? "white" : "transparent"
+                        border.width: 1
+                        border.color: cell.today ? "white" : month.pickable && cell.day.toDateString() === month.picked.toDateString() ? "#bfffffff" : "transparent"
+                    }
+                    Label {
+                        anchors.centerIn: parent
+                        text: cell.day.getDate()
+                        color: cell.today ? "black" : cell.inMonth ? "white" : "#4dffffff"
+                        font.bold: cell.today
+                    }
+                    Rectangle {
+                        visible: cell.marked
+                        anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: 6 }
+                        width: 10
+                        height: 2
+                        color: cell.today ? "black" : "white"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        enabled: month.pickable
+                        onClicked: {
+                            month.picked = cell.day;
+                            if (!cell.inMonth) month.offset += cell.index < 7 ? -1 : 1;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -135,34 +487,8 @@ ShellRoot {
         precision: SystemClock.Minutes
     }
 
-    // ---- Distro logo and user for the user menu (top left) ----
+    // ---- User and host (top left, session card, lock screen) ----
 
-    // Nerd Font logo glyphs by os-release ID; ID_LIKE is tried next, then Tux
-    readonly property var distroGlyphs: ({
-        almalinux: "\uf31d", alpine: "\uf300", aosc: "\uf301", arch: "\uf303", archarm: "\uf303", archcraft: "\uf345",
-        archlabs: "\uf31e", arcolinux: "\uf346", artix: "\uf31f", biglinux: "\uf347", cachyos: "\uf385", centos: "\uf304",
-        crystal: "\uf348", debian: "\uf306", deepin: "\uf321", devuan: "\uf307", elementary: "\uf309", endeavouros: "\uf322",
-        fedora: "\uf30a", freebsd: "\uf30c", garuda: "\uf337", gentoo: "\uf30d", guix: "\uf325", hyperbola: "\uf33a",
-        kali: "\uf327", kubuntu: "\uf333", linuxmint: "\uf30e", lxle: "\uf33e", mageia: "\uf310", mandriva: "\uf311",
-        manjaro: "\uf312", "manjaro-arm": "\uf312", mx: "\uf33f", neon: "\uf331", nixos: "\uf313", nobara: "\uf380",
-        openbsd: "\uf328", opensuse: "\uf314", "opensuse-leap": "\uf37e", "opensuse-tumbleweed": "\uf37d", parabola: "\uf340",
-        parrot: "\uf329", pop: "\uf32a", postmarketos: "\uf374", puppy: "\uf341", qubes: "\uf342", raspbian: "\uf315",
-        rhel: "\uf316", rocky: "\uf32b", sabayon: "\uf317", slackware: "\uf318", solus: "\uf32d", suse: "\uf314",
-        tails: "\uf343", trisquel: "\uf344", ubuntu: "\uf31b", void: "\uf32e", xerolinux: "\uf34a", zorin: "\uf32f"
-    })
-    property string distroLogo: "\uf31a" // Tux until os-release is read
-    FileView {
-        path: "/etc/os-release"
-        onLoaded: {
-            const f = {};
-            for (const line of text().split("\n")) {
-                const m = line.match(/^(\w+)=["']?(.*?)["']?$/);
-                if (m) f[m[1]] = m[2].toLowerCase();
-            }
-            const id = [f.ID ?? "", ...(f.ID_LIKE ?? "").split(" ")].find(i => i in root.distroGlyphs);
-            root.distroLogo = id ? root.distroGlyphs[id] : "\uf31a";
-        }
-    }
     readonly property string userName: Quickshell.env("USER")
     property string hostName: ""
     FileView {
@@ -189,7 +515,9 @@ ShellRoot {
             echo "radio $(nmcli radio wifi)"
             echo "wifi $(nmcli -t -f ACTIVE,SIGNAL,SSID dev wifi list --rescan no | grep -m1 '^yes')"
             echo "eth $(nmcli -t -f TYPE,STATE dev | grep -c '^ethernet:connected$')"
-            echo "up $(cut -d. -f1 /proc/uptime)"`]
+            echo "up $(cut -d. -f1 /proc/uptime)"
+            echo "cpu $(head -1 /proc/stat | cut -d' ' -f2-)"
+            echo "mem $(awk '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ { printf "%s ", $2 }' /proc/meminfo)"`]
         stdout: StdioCollector {
             onStreamFinished: {
                 const f = {};
@@ -205,8 +533,82 @@ ShellRoot {
                 root.wifiName = w.length > 2 ? w.slice(2).join(":") : "";
                 root.ethernet = parseInt(f.eth) > 0;
                 root.uptime = parseInt(f.up) || 0;
+
+                // CPU: busy share of the jiffies since the last sample (idle + iowait count as idle)
+                const c = (f.cpu ?? "").split(/\s+/).map(Number);
+                const total = c.reduce((x, y) => x + y, 0), idle = (c[3] ?? 0) + (c[4] ?? 0);
+                if (root.cpuLast.total > 0 && total > root.cpuLast.total)
+                    root.cpu = 1 - (idle - root.cpuLast.idle) / (total - root.cpuLast.total);
+                root.cpuLast = { total, idle };
+                // Memory in kB: MemTotal MemAvailable SwapTotal SwapFree
+                const m = (f.mem ?? "").split(/\s+/).map(Number);
+                if (m.length >= 4) root.mem = { total: m[0], used: m[0] - m[1], swapTotal: m[2], swapUsed: m[2] - m[3] };
             }
         }
+    }
+
+    // ---- CPU / memory (sampled with the network status) and the system panel ----
+
+    property real cpu: 0 // 0..1
+    property var cpuLast: ({ total: 0, idle: 0 })
+    property var mem: ({ total: 1, used: 0, swapTotal: 0, swapUsed: 0 }) // kB
+    function gib(kb) { return (kb / 1048576).toFixed(1); }
+    function bytes(n) { // 1.1 KB, 288 B, 4.2 MB
+        const u = ["B", "KB", "MB", "GB", "TB"];
+        let i = 0;
+        while (n >= 1024 && i < u.length - 1) { n /= 1024; i++; }
+        return `${i === 0 ? Math.round(n) : n.toFixed(1)} ${u[i]}`;
+    }
+
+    // Slower details, only while the system panel is open: GPU (nvidia-smi; absent while the VM has the card),
+    // mounts, temperatures, network rate
+    property string cpuModel: ""
+    property var gpu: null // { name, util 0..1, memUsed, memTotal (MiB), temp }
+    property var mounts: [] // { target, used, size } in bytes, one per device
+    property var temps: [] // { name, temp }
+    property var net: ({ dev: "", rx: 0, tx: 0, rxRate: 0, txRate: 0 })
+    Process {
+        id: sysInfo
+        command: ["sh", "-c", `
+            echo "model $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
+            nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total,temperature.gpu --format=csv,noheader,nounits 2>/dev/null | head -1 | sed 's/^/gpu /'
+            df -B1 --output=source,target,used,size -x tmpfs -x devtmpfs -x efivarfs -x overlay -x squashfs | tail -n +2 | sed 's/^/df /'
+            for h in /sys/class/hwmon/hwmon*; do [ -r $h/temp1_input ] && echo "temp $(cat $h/name) $(cat $h/temp1_input)"; done
+            dev=$(ip route show default | awk 'NR == 1 { print $5 }')
+            echo "net $dev $(awk -v d="$dev:" '$1 == d { print $2, $10 }' /proc/net/dev)"`]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let gpu = null;
+                const mounts = [], seen = new Set(), temps = [];
+                for (const line of text.trim().split("\n")) {
+                    const i = line.indexOf(" "), key = line.slice(0, i), v = line.slice(i + 1).trim();
+                    const w = v.split(/\s+/);
+                    if (key === "model") root.cpuModel = v;
+                    else if (key === "gpu") {
+                        const g = v.split(",").map(x => x.trim());
+                        gpu = { name: g[0].replace(/^NVIDIA /, ""), util: +g[1] / 100, memUsed: +g[2], memTotal: +g[3], temp: +g[4] };
+                    } else if (key === "df" && w[0].startsWith("/dev/") && !seen.has(w[0])) {
+                        seen.add(w[0]); // btrfs subvolumes share a device
+                        mounts.push({ target: w[1], used: +w[2], size: +w[3] });
+                    } else if (key === "temp") {
+                        temps.push({ name: w[0] === "k10temp" || w[0] === "coretemp" ? "cpu" : w[0], temp: Math.round(+w[1] / 1000) });
+                    } else if (key === "net" && w.length >= 3) {
+                        const rx = +w[1], tx = +w[2], o = root.net, s = root.interval / 1000;
+                        root.net = { dev: w[0], rx, tx, rxRate: o.dev === w[0] && o.rx ? (rx - o.rx) / s : 0, txRate: o.dev === w[0] && o.tx ? (tx - o.tx) / s : 0 };
+                    }
+                }
+                root.gpu = gpu;
+                root.mounts = mounts;
+                root.temps = temps;
+            }
+        }
+    }
+    Timer {
+        interval: root.interval
+        running: root.panel === "system" || (root.desktopVisible && root.showSysWidget)
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: sysInfo.running = true
     }
 
     Timer {
@@ -279,9 +681,9 @@ ShellRoot {
         wifiConnecting = network.ssid;
         wifiError = "";
         wifiConnect.network = network;
-        wifiConnect.command = password !== undefined ? ["nmcli", "dev", "wifi", "connect", network.ssid, "password", password]
+        wifiConnect.command = password !== undefined ? ["nmcli", "dev", root.nf.wifi, "connect", network.ssid, "password", password]
             : network.known ? ["nmcli", "con", "up", "id", network.ssid]
-            : ["nmcli", "dev", "wifi", "connect", network.ssid];
+            : ["nmcli", "dev", root.nf.wifi, "connect", network.ssid];
         wifiConnect.running = true;
     }
 
@@ -313,22 +715,11 @@ ShellRoot {
     // Framework7 has no Bluetooth glyph, so "" means the custom icons/bluetooth.svg
     function btIcon(device) {
         const icon = device.icon;
-        return icon.startsWith("audio") ? "headphones" : icon === "input-gaming" ? "gamecontroller_fill"
-            : icon === "input-keyboard" ? "keyboard" : icon === "phone" ? "device_phone_portrait" : "";
+        return icon.startsWith("audio") ? root.nf.headphones : icon === "input-gaming" ? root.nf.gamepad
+            : icon === "input-keyboard" ? root.nf.keyboard : icon === "phone" ? root.nf.phone : "";
     }
 
-    // Workspace dot colours: app ID -> most vivid colour of its icon (saturation x brightness), ignoring transparent pixels
-    property var appColors: ({})
-    function vividColor(colors) {
-        let best = Qt.color("white"), score = 0.15; // greyscale icons (Zen) fall back to white
-        for (const c of colors) {
-            const sc = c.hsvSaturation * c.hsvValue;
-            if (c.a > 0.5 && sc > score) { best = c; score = sc; }
-        }
-        return best;
-    }
-
-    // Icon file for an app ID, for ColorQuantizer (it can't read image://icon URLs). Theme lookups run once per
+    // Icon file for an app ID, for the overview's window badges. Theme lookups run once per
     // icon name in the background; "" until found. Prefers scalable, else the largest size.
     property var iconFiles: ({})
     Component {
@@ -353,7 +744,7 @@ ShellRoot {
         return iconFiles[icon];
     }
 
-    readonly property string wifiIcon: !wifiOn ? "wifi_slash" : wifiName === "" ? "wifi_exclamationmark" : "wifi"
+    readonly property string wifiIcon: !wifiOn ? root.nf.wifiOff : wifiName === "" ? root.nf.wifiAlert : root.nf.wifi
 
     // ---- Media: the playing player, else the last one that played, else the first one ----
 
@@ -380,8 +771,8 @@ ShellRoot {
     PwObjectTracker { objects: [root.sink] }
     readonly property real volume: sink?.audio?.volume ?? 0
     readonly property bool muted: sink?.audio?.muted ?? false
-    readonly property string volumeIcon: muted || volume === 0 ? "speaker_slash_fill"
-        : volume < 0.34 ? "speaker_1_fill" : volume < 0.67 ? "speaker_2_fill" : "speaker_3_fill"
+    readonly property string volumeIcon: muted || volume === 0 ? root.nf.volMute
+        : volume < 0.34 ? root.nf.volLow : volume < 0.67 ? root.nf.volMid : root.nf.volHigh
     // Outputs for the audio panel: hardware sinks, not app streams
     readonly property var sinks: Pipewire.nodes.values.filter(n => n.isSink && !n.isStream && n.audio)
     property bool osdArmed: false // skip the change when the sink first binds at startup
@@ -414,6 +805,11 @@ ShellRoot {
         ddcTimer.restart();
         showOsd("brightness");
     }
+    function setBrightness(v) {
+        if (brightness < 0) return;
+        brightness = Math.max(0, Math.min(100, Math.round(v)));
+        ddcTimer.restart();
+    }
     IpcHandler {
         target: "osd"
         function brightnessUp(): void { root.stepBrightness(5); }
@@ -440,6 +836,39 @@ ShellRoot {
         function toggle(): void { root.keepAwake = !root.keepAwake; }
         function get(): bool { return root.keepAwake; }
     }
+    // Days marked on the desktop calendar ("yyyy-MM-dd"), kept in a state file
+    property var marks: []
+    function dayKey(d) { return Qt.formatDate(d, "yyyy-MM-dd"); }
+    function toggleMark(d) {
+        const k = dayKey(d);
+        marks = marks.includes(k) ? marks.filter(m => m !== k) : [...marks, k].sort();
+        marksFile.setText(JSON.stringify(marks));
+    }
+    FileView {
+        id: marksFile
+        path: `${Quickshell.env("HOME")}/.local/state/quickshell/marks.json`
+        printErrors: false // missing until a day is marked
+        onLoaded: { try { root.marks = JSON.parse(text()); } catch (e) { root.marks = []; } }
+    }
+
+    // Control center switches
+    property bool dnd: false // Do Not Disturb: no popups (critical ones still show); the list still fills
+    property bool nightLight: false
+    property bool showSysWidget: true // the system monitor on the desktop
+    // Night light: hyprsunset runs while it's on and is stopped when switched off
+    Process {
+        running: root.nightLight
+        command: ["hyprsunset", "-t", "4000"]
+    }
+
+    // MPRIS doesn't push position updates, so ask for them while playing (the bar shows the position)
+    Timer {
+        running: root.player?.isPlaying ?? false
+        interval: 1000
+        repeat: true
+        onTriggered: root.player.positionChanged()
+    }
+
     property string lockPassword: "" // shared by the lock surfaces on every monitor
     property string lockError: ""
     property bool authenticating: false
@@ -526,7 +955,7 @@ ShellRoot {
                     anchors.horizontalCenter: parent.horizontalCenter
                     anchors.bottom: parent.verticalCenter
                     anchors.bottomMargin: 60
-                    spacing: -6
+                    spacing: 0
                     layer.enabled: true
                     layer.effect: MultiEffect {
                         shadowEnabled: true
@@ -537,14 +966,14 @@ ShellRoot {
 
                     Label {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        text: Qt.formatDateTime(clock.date, "dddd, d MMMM")
+                        text: `[ ${Qt.formatDateTime(clock.date, "dddd d MMMM")} ]`
                         color: "#d9ffffff"
-                        font { pixelSize: 26; weight: Font.Medium }
+                        font { pixelSize: 20 }
                     }
                     Label {
                         anchors.horizontalCenter: parent.horizontalCenter
                         text: Qt.formatDateTime(clock.date, "h:mm AP").replace(/\s*[AP]M$/i, "") // 12-hour like the bar, without AM/PM
-                        font { pixelSize: 150; weight: Font.Medium }
+                        font { pixelSize: 140; weight: Font.Bold }
                     }
                 }
 
@@ -559,44 +988,51 @@ ShellRoot {
                     layer.effect: Shadow {}
                 }
 
-                // Password, near the bottom centre, styled like the bar's pills
+                // Password, near the bottom centre: a prompt line in a box, like the bar's panels
                 Rectangle {
                     id: passwordPill
                     property real shake: 0
                     x: (parent.width - width) / 2 + shake
                     y: parent.height - height - 140
-                    width: 300
-                    height: 46
-                    radius: 23
-                    color: "#d9000000"
+                    width: 380
+                    height: 40
+                    color: "#e60d0d0d"
+                    border.width: 1
+                    border.color: lockInput.activeFocus ? "#8a8a8a" : root.edge
                     opacity: root.authenticating ? 0.6 : 1
-                    layer.enabled: true
-                    layer.effect: Shadow {}
+                    Corners {}
+
+                    Label {
+                        id: lockPrompt
+                        anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
+                        text: `${root.userName}@${root.hostName} ${root.nf.lock}`
+                        color: root.dim
+                        font.pixelSize: 14
+                    }
 
                     TextInput {
                         id: lockInput
-                        anchors { fill: parent; leftMargin: 20; rightMargin: 20 }
+                        anchors { left: lockPrompt.right; right: parent.right; top: parent.top; bottom: parent.bottom; leftMargin: 10; rightMargin: 14 }
                         verticalAlignment: TextInput.AlignVCenter
-                        horizontalAlignment: TextInput.AlignHCenter
                         color: "white"
-                        font { family: "Rubik"; pixelSize: 15; letterSpacing: 2 }
+                        font { family: root.mono; pixelSize: 14; letterSpacing: 1 }
                         echoMode: TextInput.Password
-                        passwordCharacter: "•"
+                        passwordCharacter: "*"
                         enabled: !root.authenticating
                         clip: true
                         focus: true
-                        // Hide the caret while empty so it doesn't sit on the placeholder
-                        cursorDelegate: Rectangle { width: 2; color: "white"; visible: lockInput.text !== "" && lockInput.cursorVisible }
+                        // Block caret, shown while empty too, like a terminal
+                        cursorDelegate: Rectangle { width: 8; color: "white"; visible: lockInput.cursorVisible }
                         text: root.lockPassword
                         onTextChanged: root.lockPassword = text
                         Component.onCompleted: forceActiveFocus()
 
                         Label {
-                            anchors.centerIn: parent
+                            anchors { left: parent.left; leftMargin: 14; verticalCenter: parent.verticalCenter }
                             visible: lockInput.text === ""
-                            text: root.authenticating ? "Checking…" : "Password"
-                            color: "#80ffffff"
-                            font.pixelSize: 15
+                            text: root.authenticating ? "checking…" : "password"
+                            color: "#59ffffff"
+                            font.pixelSize: 14
                         }
 
                         Keys.onReturnPressed: root.tryUnlock()
@@ -638,7 +1074,7 @@ ShellRoot {
     property var toasts: [] // notifications currently shown as popups
 
     // Open dropdown and the bar it belongs to
-    property string panel: "" // "user", "control", "apps", "airdrop", "audio", "network", "bluetooth", "calendar" or ""
+    property string panel: "" // "user", "system", "control", "apps", "airdrop", "audio", "network", "bluetooth" or ""
     property var panelBar: null
 
     // AirDrop via omdrop; the logic lives in AirDrop.qml, the icon and dropdown are in the tray pill
@@ -666,6 +1102,7 @@ ShellRoot {
 
         onNotification: n => {
             n.tracked = true;
+            if (root.dnd && n.urgency !== NotificationUrgency.Critical) return;
             root.toasts = [...root.toasts, n];
             n.closed.connect(() => root.toasts = root.toasts.filter(t => t !== n));
         }
@@ -676,7 +1113,7 @@ ShellRoot {
         screen: Quickshell.screens.find(s => Hyprland.monitorFor(s) === Hyprland.focusedMonitor) ?? Quickshell.screens[0]
         visible: root.toasts.length > 0 && (root.panel === "" || (root.panel === "apps" && root.trayMenus.length === 0)) // they'd cover the dropdown card
         anchors { top: true; right: true }
-        margins { top: 44; right: 0 } // pill bottom
+        margins { top: root.barH + 4; right: 6 }
         // Place from the screen edge: respecting the bar's exclusive zone would push the toasts down another 44px
         exclusionMode: ExclusionMode.Ignore
         WlrLayershell.layer: WlrLayer.Overlay
@@ -689,7 +1126,7 @@ ShellRoot {
         Column {
             id: toastColumn
             x: 10
-            y: 8 // same gap below the pills as the tray card
+            y: 6 // same gap below the bar as the panel card
             width: 380
             spacing: 8
 
@@ -700,11 +1137,11 @@ ShellRoot {
                     id: toast
                     required property var modelData
                     width: toastColumn.width
-                    height: toastBody.implicitHeight + 24
-                    radius: 18
-                    color: "black"
-                    layer.enabled: true
-                    layer.effect: Shadow {}
+                    height: toastBody.implicitHeight + 20
+                    color: root.glass
+                    border.width: 1
+                    border.color: root.edge
+                    Grain {}
 
                     HoverHandler { id: toastHover }
 
@@ -717,10 +1154,10 @@ ShellRoot {
 
                     ColumnLayout {
                         id: toastBody
-                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 16; rightMargin: 34 }
+                        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter; margins: 14; rightMargin: 34 }
                         spacing: 2
-                        Label { text: toast.modelData.appName; color: "#99ffffff"; font.pixelSize: 11 }
-                        Label { text: toast.modelData.summary; font.weight: Font.Medium; elide: Text.ElideRight; Layout.fillWidth: true }
+                        Label { text: toast.modelData.appName.toUpperCase(); color: root.dim; font { pixelSize: 10; letterSpacing: 1 } }
+                        Label { text: toast.modelData.summary; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
                         Label {
                             text: toast.modelData.body
                             visible: text !== ""
@@ -745,7 +1182,7 @@ ShellRoot {
                     IconButton {
                         visible: toastHover.hovered
                         anchors { right: parent.right; top: parent.top; margins: 12 }
-                        text: "xmark"
+                        text: root.nf.close
                         font.pixelSize: 13
                         closesPanel: false
                         onClicked: toast.modelData.dismiss()
@@ -867,7 +1304,6 @@ ShellRoot {
                             id: screenTile
                             width: overview.tileW
                             height: overview.tileH
-                            radius: 12
                             color: "black"
 
                             Image {
@@ -898,7 +1334,6 @@ ShellRoot {
 
                                     ClippingRectangle {
                                         anchors.fill: parent
-                                        radius: 5
                                         color: "#1c1c1e"
                                         ScreencopyView {
                                             anchors.fill: parent
@@ -919,7 +1354,6 @@ ShellRoot {
                                     }
                                     Rectangle {
                                         anchors.fill: parent
-                                        radius: 5
                                         color: "transparent"
                                         border.width: winArea.containsMouse ? 2 : 0
                                         border.color: "white"
@@ -936,7 +1370,6 @@ ShellRoot {
                         // Outline: white for the keyboard selection, grey for the current workspace
                         Rectangle {
                             anchors.fill: screenTile
-                            radius: 12
                             color: "transparent"
                             border.width: overview.selected === tile.index ? 2 : tile.current ? 1 : 0
                             border.color: overview.selected === tile.index ? "white" : "#80ffffff"
@@ -947,7 +1380,7 @@ ShellRoot {
                             anchors.horizontalCenter: parent.horizontalCenter
                             text: tile.wsId
                             color: tile.current ? "white" : "#99ffffff"
-                            font.weight: tile.current ? Font.DemiBold : Font.Normal
+                            font.bold: tile.current
                         }
                     }
                 }
@@ -1032,6 +1465,137 @@ ShellRoot {
         return found.slice(0, 7).map(f => f.e);
     }
 
+    // ---- Desktop widgets: calendar and system monitor on the wallpaper, under the windows ----
+
+    // Some monitor shows its desktop (an empty workspace), so the widgets are shown there
+    readonly property bool desktopVisible: Hyprland.monitors.values.some(m => (m.activeWorkspace?.toplevels.values.length ?? 1) === 0)
+
+    Variants {
+        model: Quickshell.screens
+
+        PanelWindow {
+            id: desk
+            required property var modelData
+            readonly property var monitor: Hyprland.monitorFor(modelData)
+            screen: modelData
+            // Only while this monitor's current workspace has no windows
+            visible: (monitor?.activeWorkspace?.toplevels.values.length ?? 1) === 0
+            anchors { top: true; bottom: true; left: true; right: true }
+            exclusionMode: ExclusionMode.Normal // stays below the bar
+            WlrLayershell.layer: WlrLayer.Bottom
+            WlrLayershell.namespace: "quickshell:desktop" // blurred behind by a layer rule in hyprland.lua
+            color: "transparent"
+            mask: Region { item: calWidget; Region { item: sysWidget } }
+
+            // Calendar, top left: the month, and the picked day with its mark
+            Rectangle {
+                id: calWidget
+                x: 24
+                y: 24
+                width: calRow.implicitWidth + 36
+                height: calRow.implicitHeight + 36
+                color: root.glassLight
+                border.width: 1
+                border.color: root.edge
+                Grain {}
+                Corners {}
+
+                RowLayout {
+                    id: calRow
+                    x: 18
+                    y: 18
+                    spacing: 18
+
+                    MonthGrid {
+                        id: deskMonth
+                        pickable: true
+                        Layout.alignment: Qt.AlignTop
+                    }
+                    Rectangle { Layout.fillHeight: true; implicitWidth: 1; color: "#262626" }
+                    ColumnLayout {
+                        id: dayPane
+                        readonly property date today: new Date(clock.date.getFullYear(), clock.date.getMonth(), clock.date.getDate())
+                        readonly property date pickedDay: new Date(deskMonth.picked.getFullYear(), deskMonth.picked.getMonth(), deskMonth.picked.getDate())
+                        readonly property int fromToday: Math.round((pickedDay - today) / 86400000)
+                        readonly property bool marked: root.marks.includes(root.dayKey(deskMonth.picked))
+                        readonly property var monthMarks: root.marks.filter(m => m.startsWith(Qt.formatDate(deskMonth.shown, "yyyy-MM-")))
+                        Layout.preferredWidth: 210
+                        Layout.fillHeight: true
+                        spacing: 4
+
+                        Label { text: Qt.formatDate(deskMonth.picked, "dddd d MMMM"); font.bold: true }
+                        Label {
+                            text: dayPane.fromToday === 0 ? "today" : dayPane.fromToday === 1 ? "tomorrow" : dayPane.fromToday === -1 ? "yesterday"
+                                : dayPane.fromToday > 0 ? `in ${dayPane.fromToday} days` : `${-dayPane.fromToday} days ago`
+                            color: root.dim
+                            font.pixelSize: 10
+                        }
+                        Item { Layout.fillHeight: true }
+                        Header { text: "MARKED"; color: root.dim; font.pixelSize: 10 }
+                        Label {
+                            Layout.fillWidth: true
+                            text: dayPane.monthMarks.length === 0 ? "nothing this month"
+                                : dayPane.monthMarks.map(m => +m.slice(8)).join(" · ")
+                            color: dayPane.monthMarks.length === 0 ? "#59ffffff" : "white"
+                            wrapMode: Text.Wrap
+                        }
+                        Item { Layout.fillHeight: true }
+                        // Mark / unmark the picked day
+                        Rectangle {
+                            Layout.fillWidth: true
+                            implicitHeight: 28
+                            color: markArea.containsMouse ? "#1fffffff" : "transparent"
+                            border.width: 1
+                            border.color: root.edge
+                            RowLayout {
+                                anchors { fill: parent; leftMargin: 4; rightMargin: 10 }
+                                Toggle { checked: dayPane.marked }
+                                Label { text: dayPane.marked ? "marked" : "mark this day"; Layout.fillWidth: true }
+                            }
+                            MouseArea {
+                                id: markArea
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                onClicked: root.toggleMark(deskMonth.picked)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // System monitor, top right
+            Rectangle {
+                id: sysWidget
+                visible: root.showSysWidget
+                x: parent.width - width - 24
+                y: 24
+                width: 420
+                height: sysCol.implicitHeight + 36
+                color: root.glassLight
+                border.width: 1
+                border.color: root.edge
+                Grain {}
+                Corners {}
+
+                ColumnLayout {
+                    id: sysCol
+                    anchors { left: parent.left; right: parent.right; top: parent.top; margins: 18 }
+                    spacing: 14
+                    RowLayout {
+                        spacing: 10
+                        Icon { text: root.nf.cpu }
+                        Label { text: "SYSTEM"; Layout.fillWidth: true; font { pixelSize: 15; bold: true; letterSpacing: 2 } }
+                        Label { text: `live · ${root.interval / 1000}s`; color: root.dim; font.pixelSize: 10 }
+                    }
+                    SystemView {
+                        Layout.fillWidth: true
+                        active: root.desktopVisible && root.showSysWidget
+                    }
+                }
+            }
+        }
+    }
+
     // ---- Bar ----
 
     Variants {
@@ -1043,23 +1607,22 @@ ShellRoot {
             screen: modelData
 
             anchors { top: true; left: true; right: true }
-            // Fixed height with room for the open launcher and shadows; resizing the surface makes everything flicker.
+            // Fixed height with room for the open launcher and panels; resizing the surface makes everything flicker.
             // The mask keeps the empty part click-through.
-            implicitHeight: 640
-            exclusiveZone: 44 // pill bottom (10 + 34); Hyprland gaps_out adds the 10px gap below
+            implicitHeight: 1000
+            exclusiveZone: root.barH // Hyprland gaps_out adds the gap below
             color: "transparent"
             // OnDemand rather than Exclusive: an exclusive layer stops the focus grab seeing clicks outside
             // Password prompts take the keyboard exclusively so the password can't land in another window
             WlrLayershell.keyboardFocus: auth ? WlrKeyboardFocus.Exclusive : launcher || (panel === "network" && root.wifiPrompt !== "") ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-            // Only interactive pills take clicks; the rest of the strip passes through.
+            // Only the strip and open boxes take clicks; the rest of the surface passes through.
             mask: Region {
-                item: workspacesPill
+                item: strip
+                Region { item: workspacesPill }
                 Region { item: logoPill }
                 Region { item: closeArea }
                 Region { item: titlePill }
-                Region { item: musicDot }
-                Region { item: trayPill }
-                Region { item: clockPill }
+                Region { item: rightPills }
                 Region { item: panelCard }
             }
 
@@ -1092,6 +1655,17 @@ ShellRoot {
                 root.mediaOpen = false;
             }
 
+            // The bar: a flat strip across the top with a hairline underneath
+            Rectangle {
+                id: strip
+                width: parent.width
+                height: root.barH
+                color: root.bg
+                visible: !bar.fullscreen
+                Grain {}
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: "#1fffffff" }
+            }
+
             // While a dropdown or the launcher is open, clicking empty bar space closes it (the focus grab doesn't see clicks on the bar)
             MouseArea {
                 id: closeArea
@@ -1100,109 +1674,126 @@ ShellRoot {
                 onClicked: { root.panel = ""; root.launcherOpen = false; root.mediaOpen = false; }
             }
 
-            // Top left: distro logo, which opens the user menu
+            // Top left: user@host, which opens the launcher
             Pill {
                 id: logoPill
-                x: 10
                 visible: !bar.fullscreen
-                IconButton {
-                    text: root.distroLogo
-                    font.family: "JetBrainsMono Nerd Font"
-                    closesPanel: false
-                    onClicked: bar.toggle("user")
+                Label {
+                    textFormat: Text.StyledText
+                    text: `${root.userName}<font color="#80ffffff">@</font>${root.hostName}`
+                    font.bold: true
+                    opacity: userArea.containsMouse ? 0.6 : 1
+                    MouseArea {
+                        id: userArea
+                        anchors.fill: parent
+                        anchors.margins: -6
+                        hoverEnabled: true
+                        onClicked: root.toggleLauncher("apps")
+                    }
                 }
             }
 
             // Then workspaces on this monitor
-            Pill {
+            Row {
                 id: workspacesPill
-                x: logoPill.x + logoPill.width + 10
+                x: logoPill.width - 4
+                height: root.barH
                 visible: !bar.fullscreen
-                spacing: 6
 
                 Repeater {
-                    // Dots 1..highest workspace on this monitor, so gaps show as empty dots and position = number.
-                    // A count (not the workspace list) keeps existing dots alive when workspaces come and go.
+                    // Cells 1..highest workspace on this monitor, so gaps show as empty cells and position = number.
+                    // A count (not the workspace list) keeps existing cells alive when workspaces come and go.
                     model: Math.max(0, ...Hyprland.workspaces.values.filter(w => w.id > 0 && w.monitor === bar.monitor).map(w => w.id))
 
-                    // A dot per workspace number, wide when active. With windows, it's filled with the main colour of
-                    // the first window's app icon; empty workspaces stay grey
+                    // A full-height square per workspace: the active one is highlighted top to bottom with a short
+                    // accent underline; numbers are white with windows, dim when empty
                     Rectangle {
                         id: ws
                         required property int index
                         readonly property int wsId: index + 1
                         readonly property var workspace: Hyprland.workspaces.values.find(w => w.id === wsId) ?? null
                         readonly property bool active: bar.monitor?.activeWorkspace?.id === wsId
-                        readonly property string app: (workspace?.toplevels.values ?? []).map(t => t.wayland?.appId ?? "").find(a => a !== "") ?? ""
-                        // From the shared cache, so dots the Repeater rebuilds get their colour straight away
-                        readonly property var appColor: root.appColors[app]
-                        implicitHeight: 8
-                        implicitWidth: active ? 22 : 8
-                        radius: 4
-                        // Grey (not white) while an app's colour is first computed. No colour animation: it showed
-                        // as a white flash whenever the dots were rebuilt
-                        color: app === "" ? (active ? "white" : "#66ffffff") : appColor === undefined ? "#66ffffff" : active ? appColor : Qt.alpha(appColor, 0.6)
+                        readonly property bool occupied: (workspace?.toplevels.values.length ?? 0) > 0
+                        width: root.barH
+                        height: root.barH
+                        color: active ? "#1fffffff" : wsArea.containsMouse ? "#0fffffff" : "transparent"
 
-                        Behavior on implicitWidth { Motion { epsilon: 0.25 } }
-
-                        // Computes an app's colour once, then the cache takes over
-                        ColorQuantizer {
-                            source: ws.app !== "" && ws.appColor === undefined && root.iconFile(ws.app) !== "" ? `file://${root.iconFile(ws.app)}` : ""
-                            depth: 3 // up to 8 colours
-                            rescaleSize: 32
-                            onColorsChanged: if (colors.length > 0 && ws.app !== "") root.appColors = Object.assign({}, root.appColors, { [ws.app]: root.vividColor(colors) })
+                        Label {
+                            anchors.centerIn: parent
+                            text: ws.wsId
+                            color: ws.active || ws.occupied ? "white" : "#59ffffff"
+                            font.bold: ws.active
+                        }
+                        Rectangle {
+                            visible: ws.active
+                            anchors { bottom: parent.bottom; horizontalCenter: parent.horizontalCenter }
+                            width: 12
+                            height: 2
+                            color: root.accent
                         }
 
+                        // Click to switch (workspace.activate() sends legacy dispatch syntax, which the Lua config rejects);
+                        // middle-click closes every window on it (politely, like SUPER+Q, so apps can ask to save)
                         MouseArea {
+                            id: wsArea
                             anchors.fill: parent
-                            anchors.margins: -4
-                            // workspace.activate() sends legacy dispatch syntax, which the Lua config rejects
-                            onClicked: {
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: mouse => {
                                 root.panel = "";
-                                Hyprland.dispatch(`hl.dsp.focus({ workspace = ${parent.wsId} })`);
+                                if (mouse.button === Qt.MiddleButton) {
+                                    for (const t of ws.workspace?.toplevels.values ?? [])
+                                        Hyprland.dispatch(`hl.dsp.window.close({ window = "address:0x${t.address}" })`);
+                                } else {
+                                    Hyprland.dispatch(`hl.dsp.focus({ workspace = ${ws.wsId} })`);
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // Top middle: a music circle (while something is playing or paused) and the window title, centred together.
-            // The title island morphs into the launcher or, from the circle, the media player.
-            readonly property bool showDot: !!root.player && root.player.playbackState !== MprisPlaybackState.Stopped && !titlePill.morphed
-            // 0..1 while the circle slides in or out
-            property real dotAmount: showDot ? 1 : 0
-            Behavior on dotAmount { Motion { epsilon: 0.01 } }
-            // 0..1 while the title island shrinks in or out (no window title, nothing morphed)
+            // Top middle: the window title as [ title ]; it morphs into the launcher, media player, password prompt and
+            // volume/brightness popup
+            // 0..1 while the title shrinks in or out (no window title, nothing morphed)
             property real titleAmount: titlePill.morphed || titlePill.title !== "" ? 1 : 0
             Behavior on titleAmount { Motion { epsilon: 0.01 } }
             readonly property real titleShown: Math.max(0, titleAmount)
-            readonly property real dotSlot: dotAmount * (34 + (titlePill.visible ? 6 * titleShown : 0))
-            readonly property real groupLeft: (width - dotSlot - (titlePill.visible ? titlePill.width * titleShown : 0)) / 2
+            readonly property real groupLeft: (width - titlePill.width * titleShown) / 2
 
-            Rectangle {
-                id: musicDot
-                x: bar.groupLeft
-                y: 10
-                width: 34
-                height: 34
-                radius: 17
-                color: "black"
-                opacity: Math.min(1, Math.max(0, bar.dotAmount))
-                scale: 0.6 + 0.4 * opacity
-                visible: opacity > 0.01 && !bar.fullscreen
-                layer.enabled: true
-                layer.effect: Shadow {}
 
-                Icon { anchors.centerIn: parent; text: "music_note" }
-                MouseArea {
-                    anchors.fill: parent
-                    onClicked: root.mediaOpen = true
-                }
+
+            // Right-click in the middle of the strip opens the launcher, even with no window title showing
+            MouseArea {
+                visible: !bar.fullscreen
+                x: (parent.width - width) / 2
+                width: 640
+                height: root.barH
+                acceptedButtons: Qt.RightButton
+                onClicked: root.toggleLauncher("apps")
+            }
+
+            // Shadow under the floating launcher, so it stands out from the windows
+            RectangularShadow {
+                x: titlePill.x
+                y: titlePill.y
+                width: titlePill.width
+                height: titlePill.height
+                offset.y: 14
+                blur: 56
+                // At most 50% opaque: Hyprland's layer blur (ignore_alpha 0.6) must not pick up the shadow
+                color: "#80000000"
+                opacity: titlePill.open ? 1 : 0
+                visible: opacity > 0 && titlePill.visible
+                Behavior on opacity { NumberAnimation { duration: 200 } }
             }
 
             Rectangle {
                 id: titlePill
                 readonly property string title: ToplevelManager.activeToplevel?.title ?? ""
+                // Last non-empty title, kept while the title shrinks away
+                property string shownTitle: title
+                onTitleChanged: if (title !== "") shownTitle = title
                 readonly property bool open: bar.launcher
                 readonly property bool media: bar.media
                 readonly property bool auth: bar.auth
@@ -1211,9 +1802,6 @@ ShellRoot {
                 readonly property bool osd: root.osdKind !== "" && !open && !media && !auth && !(root.osdKind === "volume" && bar.panel === "audio") && bar.monitor?.name === Hyprland.focusedMonitor?.name
                 readonly property bool morphed: open || media || auth || osd
                 property real shake: 0 // sideways offset for the wrong-password shake
-                // Last non-empty title, kept while the island shrinks away
-                property string shownTitle: title
-                onTitleChanged: if (title !== "") shownTitle = title
                 readonly property bool clipMode: root.launcherMode === "clipboard"
                 readonly property var apps: open && !clipMode ? root.searchApps(search.text) : []
                 // Clipboard mode: history entries containing the query, newest first
@@ -1225,24 +1813,29 @@ ShellRoot {
                 property int selected: 0
 
                 // Scaled about its centre, so shift it to stay centred in its shrinking slot
-                x: bar.groupLeft + bar.dotSlot + shake - width * (1 - bar.titleShown) / 2
-                y: 10
+                x: bar.groupLeft + shake - width * (1 - bar.titleShown) / 2
+                // The launcher drops from the strip to the upper middle of the screen (Spotlight style); the rest hang from the top
+                y: open ? Math.round(bar.screen.height * 0.22) : 0
+                Behavior on y { Motion {} }
                 scale: bar.titleShown
                 opacity: Math.min(1, bar.titleShown)
                 visible: (!bar.fullscreen || bar.overFullscreen) && bar.titleShown > 0.01
-                width: auth ? 460 : open ? 640 : media ? 520 : osd ? 320 : Math.min(titleLabel.implicitWidth, 600) + 28
-                height: auth ? authBody.implicitHeight + 36 : open ? 46 + (resultCount > 0 ? resultCount * 40 + 8 : 0) : media ? 132 : osd ? 40 : 34
-                radius: auth ? 30 : open ? 23 : media ? 30 : osd ? 20 : 17
-                color: "black"
-                clip: true
+                width: auth ? 460 : open ? 680 : media ? 520 : osd ? 340 : Math.min(titleLabel.implicitWidth, 600) + 20
+                height: auth ? authBody.implicitHeight + 36 : open ? 40 + (resultCount > 0 ? resultCount * 32 + 8 : 0) : media ? 132 : root.barH
+                // Text in the strip; morphed it hangs from the top as a bordered box (the OSD stays in the strip, boxed only
+                // over a fullscreen window)
+                color: (!morphed || osd) && !bar.overFullscreen ? "transparent" : root.glass
+                border.width: 1
+                border.color: (morphed && !osd) || bar.overFullscreen ? root.edge : "transparent"
+
+                // Glass frame while morphed (the content clips itself below); brackets on the floating launcher
+                Grain { visible: titlePill.morphed && !titlePill.osd }
+                Corners { visible: titlePill.open }
 
                 // Springy resize for the morph
                 Behavior on width { Motion {} }
                 Behavior on height { Motion {} }
-                Behavior on radius { Motion {} }
 
-                layer.enabled: true
-                layer.effect: Shadow {}
 
                 onOpenChanged: {
                     search.text = "";
@@ -1271,15 +1864,20 @@ ShellRoot {
                     anchors.fill: parent
                     clip: true
 
-                // Swallow clicks on empty launcher space so they don't reach the close area underneath
-                MouseArea { anchors.fill: parent; enabled: titlePill.morphed }
+                // Right-clicking the title opens the launcher (like SUPER+Space);
+                // once morphed, swallow clicks on empty launcher space so they don't reach the close area underneath
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: titlePill.morphed ? Qt.LeftButton : Qt.RightButton
+                    onClicked: if (!titlePill.morphed) root.toggleLauncher("apps")
+                }
 
                 Label {
                     id: titleLabel
                     anchors.centerIn: parent
                     width: Math.min(implicitWidth, 600)
-                    text: titlePill.shownTitle
-                    elide: Text.ElideRight
+                    text: `[ ${titlePill.shownTitle} ]`
+                    elide: Text.ElideMiddle
                     // Also waits for the volume/brightness popup to fade out
                     opacity: titlePill.morphed || osdBody.visible ? 0 : 1
                     Behavior on opacity { NumberAnimation { duration: 90 } }
@@ -1302,9 +1900,9 @@ ShellRoot {
                     Behavior on shownLevel { Motion { epsilon: 0.002 } }
                     // Laid out at the popup's final size and centred, so the morph from a wide title doesn't stretch it
                     anchors.centerIn: parent
-                    width: 320 - 32
-                    height: 40
-                    spacing: 12
+                    width: 340 - 24
+                    height: root.barH
+                    spacing: 10
                     // Fades in once the title has faded out, and out before the title returns, so they never overlap.
                     // Explicit animations: a SequentialAnimation inside a Behavior didn't run on close
                     opacity: 0
@@ -1327,25 +1925,16 @@ ShellRoot {
                     Icon {
                         Layout.preferredWidth: 22
                         horizontalAlignment: Text.AlignHCenter
-                        text: !osdBody.isVolume ? (osdBody.level < 0.5 ? "sun_min_fill" : "sun_max_fill")
+                        text: !osdBody.isVolume ? (osdBody.level < 0.5 ? root.nf.sunLow : root.nf.sunHigh)
                             : root.volumeIcon
                     }
-                    Rectangle {
+                    Ticks {
                         Layout.fillWidth: true
-                        height: 6
-                        radius: 3
-                        color: "#33ffffff"
-                        Rectangle {
-                            width: parent.width * Math.max(0, Math.min(1, osdBody.shownLevel))
-                            height: parent.height
-                            radius: 3
-                            color: osdBody.muted ? "#66ffffff" : "white"
-                        }
+                        level: osdBody.shownLevel
+                        muted: osdBody.muted
                     }
                     Label {
-                        Layout.preferredWidth: 34
-                        horizontalAlignment: Text.AlignRight
-                        text: Math.round(osdBody.level * 100)
+                        text: `[ ${osdBody.isVolume ? "VOL" : "BRT"} ${String(Math.round(osdBody.level * 100)).padStart(3)}% ]`
                         color: osdBody.muted ? "#99ffffff" : "white"
                     }
                 }
@@ -1393,10 +1982,10 @@ ShellRoot {
 
                         RowLayout {
                             spacing: 12
-                            Icon { text: "lock_fill"; font.pixelSize: 22; Layout.alignment: Qt.AlignTop }
+                            Icon { text: root.nf.lock; font.pixelSize: 22; Layout.alignment: Qt.AlignTop }
                             ColumnLayout {
                                 spacing: 2
-                                Label { text: "Authentication required"; font { pixelSize: 15; weight: Font.Medium } }
+                                Header { text: "AUTHENTICATION REQUIRED" }
                                 Label {
                                     Layout.fillWidth: true
                                     text: authPrompt.flow?.message ?? ""
@@ -1409,20 +1998,20 @@ ShellRoot {
                         // Password field
                         Rectangle {
                             Layout.fillWidth: true
-                            implicitHeight: 40
-                            radius: 14
-                            color: "#1affffff"
+                            implicitHeight: 34
+                            color: "transparent"
                             border.width: 1
-                            border.color: password.activeFocus ? "#40ffffff" : "transparent"
+                            border.color: password.activeFocus ? "#8a8a8a" : root.edge
 
                             TextInput {
                                 id: password
                                 anchors { fill: parent; leftMargin: 14; rightMargin: 14 }
                                 verticalAlignment: TextInput.AlignVCenter
                                 color: "white"
-                                font { family: "Rubik"; pixelSize: 15 }
+                                font { family: root.mono; pixelSize: 13 }
                                 echoMode: polkit.flow?.responseVisible ? TextInput.Normal : TextInput.Password
-                                passwordCharacter: "•"
+                                passwordCharacter: "*"
+                                cursorDelegate: Rectangle { width: 7; color: "white"; visible: password.cursorVisible }
                                 enabled: polkit.flow?.isResponseRequired ?? false
                                 clip: true
 
@@ -1430,9 +2019,10 @@ ShellRoot {
                                     anchors.verticalCenter: parent.verticalCenter
                                     visible: password.text === ""
                                     // polkit's prompt is usually "Password: "
-                                    text: (polkit.flow?.inputPrompt || "Password").replace(/:\s*$/, "")
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 12
+                                    text: (polkit.flow?.inputPrompt || "Password").replace(/:\s*$/, "").toLowerCase()
                                     color: "#66ffffff"
-                                    font.pixelSize: 15
                                 }
 
                                 Keys.onReturnPressed: authPrompt.submit()
@@ -1456,10 +2046,11 @@ ShellRoot {
                             Item { Layout.fillWidth: true }
                             Rectangle {
                                 implicitWidth: 96
-                                implicitHeight: 34
-                                radius: 17
-                                color: cancelArea.containsMouse ? "#33ffffff" : "#1affffff"
-                                Label { anchors.centerIn: parent; text: "Cancel" }
+                                implicitHeight: 30
+                                color: cancelArea.containsMouse ? "#1fffffff" : "transparent"
+                                border.width: 1
+                                border.color: root.edge
+                                Label { anchors.centerIn: parent; text: "cancel" }
                                 MouseArea {
                                     id: cancelArea
                                     anchors.fill: parent
@@ -1469,11 +2060,10 @@ ShellRoot {
                             }
                             Rectangle {
                                 implicitWidth: 120
-                                implicitHeight: 34
-                                radius: 17
+                                implicitHeight: 30
                                 color: "white"
                                 opacity: authArea.containsMouse ? 0.85 : 1
-                                Label { anchors.centerIn: parent; text: "Authenticate"; color: "black"; font.weight: Font.Medium }
+                                Label { anchors.centerIn: parent; text: "authenticate"; color: "black"; font.bold: true }
                                 MouseArea {
                                     id: authArea
                                     anchors.fill: parent
@@ -1508,7 +2098,6 @@ ShellRoot {
                         ClippingRectangle {
                             implicitWidth: 104
                             implicitHeight: 104
-                            radius: 18
                             color: "#1affffff"
 
                             Image {
@@ -1522,7 +2111,7 @@ ShellRoot {
                             Icon {
                                 anchors.centerIn: parent
                                 visible: art.status !== Image.Ready
-                                text: "music_note"
+                                text: root.nf.music
                                 color: "#66ffffff"
                                 font.pixelSize: 40
                             }
@@ -1559,12 +2148,10 @@ ShellRoot {
                                     anchors.verticalCenter: parent.verticalCenter
                                     width: parent.width
                                     height: 4
-                                    radius: 2
                                     color: "#33ffffff"
                                     Rectangle {
                                         width: parent.width * Math.min(1, (root.player?.position ?? 0) / Math.max(progress.length, 1))
                                         height: parent.height
-                                        radius: 2
                                         color: "white"
                                     }
                                 }
@@ -1586,20 +2173,20 @@ ShellRoot {
                                 Layout.alignment: Qt.AlignHCenter
                                 spacing: 22
                                 IconButton {
-                                    text: "backward_end_fill"
+                                    text: root.nf.prev
                                     font.pixelSize: 24
                                     enabled: root.player?.canGoPrevious ?? false
                                     opacity: enabled ? 1 : 0.4
                                     onClicked: root.player.previous()
                                 }
                                 IconButton {
-                                    text: root.player?.isPlaying ? "pause_fill" : "play_fill"
+                                    text: root.player?.isPlaying ? root.nf.pause : root.nf.play
                                     font.pixelSize: 30
                                     enabled: root.player?.canTogglePlaying ?? false
                                     onClicked: root.player.togglePlaying()
                                 }
                                 IconButton {
-                                    text: "forward_end_fill"
+                                    text: root.nf.next
                                     font.pixelSize: 24
                                     enabled: root.player?.canGoNext ?? false
                                     opacity: enabled ? 1 : 0.4
@@ -1618,23 +2205,25 @@ ShellRoot {
 
                     RowLayout {
                         id: searchRow
-                        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 18; rightMargin: 18 }
-                        height: 46
+                        anchors { left: parent.left; right: parent.right; top: parent.top; leftMargin: 14; rightMargin: 14 }
+                        height: 40
                         spacing: 10
-                        Icon { text: titlePill.clipMode ? "doc_on_clipboard" : "search"; color: "#99ffffff" }
+                        Label { text: titlePill.clipMode ? "clip ❯" : "run ❯"; color: "#99ffffff"; font { pixelSize: 13; bold: true } }
                         TextInput {
                             id: search
                             Layout.fillWidth: true
                             color: "white"
                             selectionColor: "#55ffffff"
-                            font { family: "Rubik"; pixelSize: 15 }
+                            font { family: root.mono; pixelSize: 13 }
                             clip: true
+                            cursorDelegate: Rectangle { width: 7; color: "white"; visible: search.cursorVisible }
 
                             Label {
+                                x: 12
                                 visible: search.text === ""
-                                text: titlePill.clipMode ? "Search clipboard history" : "Search apps or run a command"
-                                color: "#66ffffff"
-                                font.pixelSize: 15
+                                text: titlePill.clipMode ? "search clipboard history" : "search apps or type a command"
+                                color: "#59ffffff"
+                                font.pixelSize: 13
                             }
 
                             Keys.onPressed: event => {
@@ -1669,9 +2258,10 @@ ShellRoot {
                                 readonly property var app: titlePill.apps[index] ?? null
                                 readonly property var clipEntry: titlePill.clips[index] ?? null
                                 width: parent.width
-                                height: 40
-                                radius: 14
-                                color: titlePill.selected === index ? "#26ffffff" : "transparent"
+                                height: 32
+                                color: titlePill.selected === index ? "#262626" : "transparent"
+                                // Selection marker on the left edge
+                                Rectangle { width: 2; height: parent.height; color: "white"; visible: titlePill.selected === result.index }
 
                                 RowLayout {
                                     anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
@@ -1679,12 +2269,12 @@ ShellRoot {
                                     IconImage {
                                         visible: result.app !== null
                                         source: result.app ? Quickshell.iconPath(result.app.icon, "application-x-executable") : ""
-                                        implicitSize: 22
+                                        implicitSize: 18
                                     }
                                     Icon {
                                         visible: result.app === null
-                                        text: result.clipEntry ? (result.clipEntry.image ? "photo" : "doc_text") : "greaterthan_square"
-                                        Layout.preferredWidth: 22
+                                        text: result.clipEntry ? (result.clipEntry.image ? root.nf.image : root.nf.file) : root.nf.terminal
+                                        Layout.preferredWidth: 18
                                     }
                                     Label {
                                         Layout.fillWidth: true
@@ -1717,32 +2307,25 @@ ShellRoot {
                 }
             }
 
-            // Top right: system tray, then time/date in the corner
+            // Top right: tray apps, media, date and time, Wi-Fi, volume, control center, session
             Row {
                 id: rightPills
                 visible: !bar.fullscreen
                 anchors.right: parent.right
-                anchors.rightMargin: 10
-                spacing: 10
+                spacing: 0
 
                 // System tray; its panels open in the card in the top right corner
-                Rectangle {
+                Item {
                     id: trayPill
-                    y: 10
-                    // No spring here: the app icons' own spring drives the width, so the content never lags the pill
-                    width: trayIcons.implicitWidth + 28
-                    height: 34
-                    radius: 17
-                    color: "black"
-
-                    layer.enabled: true
-                    layer.effect: Shadow {}
+                    // No spring here: the app icons' own spring drives the width, so the content never lags the strip
+                    width: trayIcons.implicitWidth + 20
+                    height: root.barH
 
                     RowLayout {
                         id: trayIcons
                         anchors.centerIn: parent
-                        height: 34
-                        spacing: 12
+                        height: root.barH
+                        spacing: 16
 
                         // Tray icons from other apps, hidden behind the chevron; opening springs the pill out to the left.
                         // Left click opens the app (or its menu if that's all it has), right click its menu in the card,
@@ -1805,161 +2388,87 @@ ShellRoot {
                         IconButton {
                             id: appsButton
                             visible: SystemTray.items.values.length > 0
-                            text: bar.panel === "apps" ? "chevron_right" : "chevron_left"
+                            text: bar.panel === "apps" ? root.nf.right : root.nf.left
                             font.pixelSize: 10 // small, like the Material chevron
                             closesPanel: false
                             onClicked: bar.toggle("apps")
                         }
 
-                        // Volume: click for the audio panel, scroll to change volume
-                        IconButton {
-                            text: root.volumeIcon
-                            // Fixed width: the speaker glyphs widen with the level and would nudge the pill
-                            Layout.preferredWidth: 22
-                            horizontalAlignment: Text.AlignHCenter
-                            closesPanel: false
-                            onClicked: bar.toggle("audio")
+                        // Media: [ player · position ]; click for the player
+                        Label {
+                            visible: !!root.player && root.player.playbackState !== MprisPlaybackState.Stopped
+                            Layout.leftMargin: 4
+                            text: `[ ${(root.player?.identity || "media").split(" ")[0].toLowerCase()} · ${root.formatTime(root.player?.position ?? 0)} ]`
+                            opacity: mediaArea.containsMouse ? 0.6 : 1
                             MouseArea {
+                                id: mediaArea
                                 anchors.fill: parent
-                                acceptedButtons: Qt.NoButton
+                                hoverEnabled: true
+                                onClicked: root.mediaOpen = !root.mediaOpen
+                            }
+                        }
+
+                        // Date and time
+                        Label {
+                            text: Qt.formatDateTime(clock.date, "ddd MMM d  h:mm AP")
+                            color: "#e6ffffff"
+                        }
+
+                        IconButton {
+                            text: root.ethernet && root.wifiName === "" ? root.nf.ethernet : root.wifiIcon
+                            closesPanel: false
+                            onClicked: bar.toggle("network")
+                        }
+
+                        // Volume, icon and percentage: click for the audio panel, scroll to change volume
+                        Item {
+                            implicitWidth: volRow.implicitWidth
+                            implicitHeight: volRow.implicitHeight
+                            opacity: volArea.containsMouse ? 0.6 : 1
+                            Row {
+                                id: volRow
+                                spacing: 6
+                                // Fixed width: the speaker glyphs widen with the level and would nudge the row
+                                Icon { text: root.volumeIcon; width: 18; horizontalAlignment: Text.AlignHCenter; anchors.verticalCenter: parent.verticalCenter }
+                                Label { text: root.muted ? "mute" : `${Math.round(root.volume * 100)}%`; anchors.verticalCenter: parent.verticalCenter }
+                            }
+                            MouseArea {
+                                id: volArea
+                                anchors.fill: parent
+                                anchors.margins: -5
+                                hoverEnabled: true
+                                onClicked: bar.toggle("audio")
                                 onWheel: wheel => {
                                     if (!root.sink?.audio) return;
                                     root.sink.audio.volume = Math.max(0, Math.min(1, root.volume + (wheel.angleDelta.y > 0 ? 0.02 : -0.02)));
                                 }
                             }
                         }
+                        // Control center; closes from any of its panels
                         IconButton {
-                            text: root.ethernet && root.wifiName === "" ? "arrow_left_right" : root.wifiIcon
+                            text: root.nf.sliders
+                            font.pixelSize: 14
                             closesPanel: false
-                            onClicked: bar.toggle("network")
+                            onClicked: ["control", "airdrop", "bluetooth", "system"].includes(bar.panel) ? root.panel = "" : bar.toggle("control")
                         }
-                        // Control center: AirDrop, Bluetooth, keep awake and notifications; closes from any of its panels
+                        // Session: lock, suspend, log out, restart, shut down
                         IconButton {
-                            text: "slider_horizontal_3"
+                            text: root.nf.power
+                            font.pixelSize: 14
                             closesPanel: false
-                            onClicked: ["control", "airdrop", "bluetooth"].includes(bar.panel) ? root.panel = "" : bar.toggle("control")
+                            onClicked: bar.toggle("user")
                         }
                     }
                 }
 
-                // Clock; clicking it morphs the pill into a month calendar below the time
-                Rectangle {
-                    id: clockPill
-                    readonly property bool open: bar.panel === "calendar"
-                    property int monthOffset: 0 // months away from the current one
-                    readonly property date shown: new Date(clock.date.getFullYear(), clock.date.getMonth() + monthOffset, 1)
-                    // First cell: the week day the locale starts weeks on, on or before the 1st
-                    readonly property int lead: (shown.getDay() - Qt.locale().firstDayOfWeek % 7 + 7) % 7
-                    onOpenChanged: monthOffset = 0
 
-                    y: 10
-                    width: open ? 7 * 36 + 24 : clockLabel.implicitWidth + 28
-                    height: open ? 34 + calendar.implicitHeight + 10 : 34
-                    radius: open ? 22 : 17
-                    color: "black"
-
-                    Behavior on width { Motion {} }
-                    Behavior on height { Motion {} }
-                    Behavior on radius { Motion {} }
-
-                    layer.enabled: true
-                    layer.effect: Shadow {}
-
-                    // Clip here, not on the pill: its shadow layer pads the area and would show content outside it mid-morph
-                    Item {
-                        anchors.fill: parent
-                        clip: true
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: if (!clockPill.open) bar.toggle("calendar")
-                            onWheel: wheel => { if (clockPill.open) clockPill.monthOffset += wheel.angleDelta.y > 0 ? -1 : 1; }
-                        }
-
-                        Label {
-                            id: clockLabel
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            height: 34
-                            verticalAlignment: Text.AlignVCenter
-                            text: Qt.formatDateTime(clock.date, "ddd d MMM  h:mm AP")
-                            font.weight: Font.Medium
-                            MouseArea { anchors.fill: parent; onClicked: bar.toggle("calendar") }
-                        }
-
-                        ColumnLayout {
-                            id: calendar
-                            anchors { left: parent.left; right: parent.right; top: clockLabel.bottom; margins: 12; topMargin: 2 }
-                            spacing: 4
-                            opacity: clockPill.open ? 1 : 0
-                            visible: opacity > 0
-                            Behavior on opacity { NumberAnimation { duration: 200 } }
-
-                            // Month and year, with previous / next
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Label {
-                                    Layout.fillWidth: true
-                                    Layout.leftMargin: 6
-                                    text: Qt.formatDate(clockPill.shown, "MMMM yyyy")
-                                    font.weight: Font.DemiBold
-                                }
-                                IconButton { text: "chevron_left"; font.pixelSize: 13; closesPanel: false; onClicked: clockPill.monthOffset-- }
-                                IconButton { text: "chevron_right"; font.pixelSize: 13; closesPanel: false; onClicked: clockPill.monthOffset++ }
-                            }
-
-                            Grid {
-                                columns: 7
-                                // Week day initials
-                                Repeater {
-                                    model: 7
-                                    Label {
-                                        required property int index
-                                        width: 36
-                                        height: 24
-                                        horizontalAlignment: Text.AlignHCenter
-                                        verticalAlignment: Text.AlignVCenter
-                                        text: Qt.locale().dayName((Qt.locale().firstDayOfWeek + index) % 7, Locale.NarrowFormat)
-                                        color: "#80ffffff"
-                                        font.pixelSize: 11
-                                    }
-                                }
-                                // Six weeks; days outside the month are dimmed, today is filled
-                                Repeater {
-                                    model: 42
-                                    Item {
-                                        required property int index
-                                        readonly property date day: new Date(clockPill.shown.getFullYear(), clockPill.shown.getMonth(), index - clockPill.lead + 1)
-                                        readonly property bool inMonth: day.getMonth() === clockPill.shown.getMonth()
-                                        readonly property bool today: day.toDateString() === clock.date.toDateString()
-                                        width: 36
-                                        height: 32
-                                        Rectangle {
-                                            anchors.centerIn: parent
-                                            width: 28
-                                            height: 28
-                                            radius: 14
-                                            color: "white"
-                                            visible: parent.today
-                                        }
-                                        Label {
-                                            anchors.centerIn: parent
-                                            text: parent.day.getDate()
-                                            color: parent.today ? "black" : parent.inMonth ? "white" : "#4dffffff"
-                                            font.weight: parent.today ? Font.DemiBold : Font.Normal
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
 
             // Dropdown panels: a card below the pills, in the top right corner (top left for the user menu)
             Rectangle {
                 id: panelCard
                 // The tray apps open in the tray pill; the card only shows for one of their menus
-                readonly property bool open: bar.panel !== "" && bar.panel !== "calendar" && (bar.panel !== "apps" || root.trayMenus.length > 0)
+                readonly property bool open: bar.panel !== "" && (bar.panel !== "apps" || root.trayMenus.length > 0)
                 // The panel whose content is shown; kept while the card closes so it can fade out
                 property string shownPanel: ""
                 Connections {
@@ -1969,23 +2478,32 @@ ShellRoot {
                 onOpenChanged: if (open) shownPanel = bar.panel
 
                 visible: !bar.fullscreen && opacity > 0
-                // Below the logo for the user menu, from the click for a tray menu (kept on screen), otherwise the top right corner
-                x: shownPanel === "user" ? 10
-                    : shownPanel === "apps" ? Math.min(bar.trayMenuX, parent.width - width - 10)
-                    : parent.width - width - 10
-                y: 10 + 34 + 8
+                // From the click for a tray menu (kept on screen), otherwise the top right corner
+                x: shownPanel === "apps" ? Math.min(bar.trayMenuX, parent.width - width - 12) : parent.width - width - 12
+                y: root.barH + 10
                 // A tray app's menu is only as wide as its rows
-                width: shownPanel === "apps" ? Math.min(parent.width - 20, cardBody.implicitWidth + 16) : 340
-                height: open ? cardBody.implicitHeight + 16 : 34
-                radius: 22
-                color: "black"
+                width: shownPanel === "apps" ? Math.min(parent.width - 24, cardBody.implicitWidth + 24) : shownPanel === "system" ? 400 : 380
+                height: open ? cardBody.implicitHeight + 34 : 34
+                color: root.glass
+                border.width: 1
+                border.color: root.edge
                 opacity: open ? 1 : 0
 
                 Behavior on height { Motion {} }
                 Behavior on opacity { NumberAnimation { duration: 200 } }
 
-                layer.enabled: true
-                layer.effect: Shadow {}
+                // Frame: noise, corner brackets and tags on the borders
+                Grain {}
+                Corners {}
+                Tag {
+                    x: 12
+                    y: -height / 2
+                    text: ({ user: "SESSION", apps: "MENU", network: "NETWORK", audio: "AUDIO", control: "CONTROL",
+                        airdrop: "AIRDROP", bluetooth: "BLUETOOTH", system: "SYSTEM" })[panelCard.shownPanel] ?? ""
+                }
+                Tag { x: parent.width - width - 12; y: -height / 2; text: "MONOCHROME" }
+                Tag { x: 12; y: parent.height - height / 2; text: `GRAIN ${root.boxGrain.toFixed(2)}` }
+                Tag { x: parent.width - width - 12; y: parent.height - height / 2; text: `${Math.round(parent.width)} × AUTO` }
 
                 // Clip here, not on the card: its shadow layer pads the area and would show content outside it mid-morph
                 Item {
@@ -1997,7 +2515,7 @@ ShellRoot {
 
                     ColumnLayout {
                         id: cardBody
-                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 8 }
+                        anchors { left: parent.left; right: parent.right; top: parent.top; margins: 12; topMargin: 18 }
                         spacing: 2
 
                     // App tray menu
@@ -2008,7 +2526,7 @@ ShellRoot {
                     MenuItem {
                         // Submenus only; the app's own menu closes back to the icons in the tray pill
                         visible: panelCard.shownPanel === "apps" && root.trayMenus.length > 1
-                        icon: "chevron_left"
+                        icon: root.nf.left
                         label: "Back"
                         onClicked: root.trayMenus = root.trayMenus.slice(0, -1)
                     }
@@ -2033,7 +2551,6 @@ ShellRoot {
                             Rectangle {
                                 visible: !menuEntry.modelData.isSeparator
                                 anchors.fill: parent
-                                radius: 10
                                 color: entryArea.containsMouse && menuEntry.modelData.enabled ? "#22ffffff" : "transparent"
                                 opacity: menuEntry.modelData.enabled ? 1 : 0.4
 
@@ -2044,15 +2561,15 @@ ShellRoot {
                                     Icon {
                                         visible: menuEntry.modelData.buttonType !== QsMenuButtonType.None
                                         text: menuEntry.modelData.buttonType === QsMenuButtonType.RadioButton
-                                            ? (menuEntry.modelData.checkState === Qt.Checked ? "largecircle_fill_circle" : "circle")
-                                            : (menuEntry.modelData.checkState === Qt.Checked ? "checkmark_square_fill" : "square")
+                                            ? (menuEntry.modelData.checkState === Qt.Checked ? root.nf.radioOn : root.nf.radioOff)
+                                            : (menuEntry.modelData.checkState === Qt.Checked ? root.nf.checkBox : root.nf.box)
                                     }
                                     Label {
                                         text: menuEntry.modelData.text.replace(/_(?!_)/g, "") // drop mnemonic underscores
                                         elide: Text.ElideRight
                                         Layout.fillWidth: true
                                     }
-                                    Icon { visible: menuEntry.modelData.hasChildren; text: "chevron_right" }
+                                    Icon { visible: menuEntry.modelData.hasChildren; text: root.nf.right }
                                 }
 
                                 MouseArea {
@@ -2079,8 +2596,8 @@ ShellRoot {
                         visible: panelCard.shownPanel === "network"
                         Layout.margins: 6
                         spacing: 10
-                        Icon { text: root.wifiOn ? "wifi" : "wifi_slash" }
-                        Label { text: "Wi-Fi"; font.weight: Font.Medium; Layout.fillWidth: true }
+                        Icon { text: root.wifiOn ? root.nf.wifi : root.nf.wifiOff }
+                        Header { text: "WI-FI"; Layout.fillWidth: true }
                         Toggle {
                             checked: root.wifiOn
                             MouseArea {
@@ -2096,14 +2613,14 @@ ShellRoot {
                         visible: panelCard.shownPanel === "network" && root.ethernet
                         Layout.margins: 6
                         spacing: 10
-                        Icon { text: "arrow_left_right" }
+                        Icon { text: root.nf.ethernet }
                         Label { text: "Ethernet connected" }
                     }
                     RowLayout {
                         visible: root.wifiScan && panelCard.shownPanel === "network"
                         Layout.margins: 6
                         Layout.topMargin: 8
-                        Label { text: "Networks"; color: "#99ffffff"; Layout.fillWidth: true }
+                        Header { text: "NETWORKS"; color: root.dim; Layout.fillWidth: true }
                         Label { text: wifiList.running ? "Searching…" : ""; color: "#99ffffff" }
                     }
                     // Scrolls past 320px: the bar surface is 640px tall
@@ -2129,7 +2646,7 @@ ShellRoot {
                                     spacing: 2
 
                                     MenuItem {
-                                        icon: "wifi"
+                                        icon: root.nf.wifi
                                         label: net.modelData.ssid
                                             + (root.wifiConnecting === net.modelData.ssid ? "  ·  Connecting…" : net.modelData.active ? "  ·  Connected" : "")
                                         opacity: net.modelData.active ? 1 : 0.6 + 0.4 * net.modelData.signal / 100
@@ -2141,7 +2658,7 @@ ShellRoot {
                                         Icon {
                                             visible: net.modelData.secure
                                             anchors { right: parent.right; rightMargin: 12; verticalCenter: parent.verticalCenter }
-                                            text: "lock_fill"
+                                            text: root.nf.lock
                                             font.pixelSize: 12
                                             color: "#99ffffff"
                                         }
@@ -2151,26 +2668,28 @@ ShellRoot {
                                         Layout.fillWidth: true
                                         Layout.leftMargin: 6
                                         Layout.rightMargin: 6
-                                        implicitHeight: 34
-                                        radius: 10
-                                        color: "#1affffff"
+                                        implicitHeight: 30
+                                        color: "transparent"
                                         border.width: 1
-                                        border.color: wifiPassword.activeFocus ? "#40ffffff" : "transparent"
+                                        border.color: wifiPassword.activeFocus ? "#8a8a8a" : root.edge
 
                                         TextInput {
                                             id: wifiPassword
                                             anchors { fill: parent; leftMargin: 12; rightMargin: 12 }
                                             verticalAlignment: TextInput.AlignVCenter
                                             color: "white"
-                                            font { family: "Rubik"; pixelSize: 13 }
+                                            font { family: root.mono; pixelSize: 13 }
                                             echoMode: TextInput.Password
-                                            passwordCharacter: "•"
+                                            passwordCharacter: "*"
+                                            cursorDelegate: Rectangle { width: 7; color: "white"; visible: wifiPassword.cursorVisible }
                                             enabled: root.wifiConnecting === ""
                                             clip: true
                                             onVisibleChanged: { text = ""; if (visible) forceActiveFocus(); }
                                             Label {
+                                                x: 10
+                                                anchors.verticalCenter: parent.verticalCenter
                                                 visible: wifiPassword.text === ""
-                                                text: "Password"
+                                                text: "password"
                                                 color: "#66ffffff"
                                             }
                                             Keys.onReturnPressed: if (text !== "") root.wifiJoin(net.modelData, text)
@@ -2202,17 +2721,10 @@ ShellRoot {
                             closesPanel: false
                             onClicked: if (root.sink?.audio) root.sink.audio.muted = !root.muted
                         }
-                        Rectangle {
+                        Ticks {
                             Layout.fillWidth: true
-                            height: 6
-                            radius: 3
-                            color: "#33ffffff"
-                            Rectangle {
-                                width: parent.width * Math.min(1, root.volume)
-                                height: parent.height
-                                radius: 3
-                                color: root.muted ? "#66ffffff" : "white"
-                            }
+                            level: root.volume
+                            muted: root.muted
                             MouseArea {
                                 anchors.fill: parent
                                 anchors.margins: -10 // easier to grab than the 6px track
@@ -2223,9 +2735,7 @@ ShellRoot {
                             }
                         }
                         Label {
-                            Layout.preferredWidth: 34
-                            horizontalAlignment: Text.AlignRight
-                            text: Math.round(root.volume * 100)
+                            text: `[ VOL ${String(Math.round(root.volume * 100)).padStart(3)}% ]`
                             color: root.muted ? "#99ffffff" : "white"
                         }
                     }
@@ -2242,7 +2752,7 @@ ShellRoot {
                         MenuItem {
                             required property var modelData
                             readonly property bool current: modelData === root.sink
-                            icon: current ? "checkmark_alt" : ""
+                            icon: current ? root.nf.check : ""
                             // The monitor's name for HDMI/DP audio; when two outputs share it, add the card (first word of the description)
                             readonly property string nick: modelData.nickname || modelData.description || modelData.name
                             label: nick + (root.sinks.filter(n => (n.nickname || n.description || n.name) === nick).length > 1 ? `  ·  ${modelData.description.split(" ")[0]}` : "")
@@ -2255,11 +2765,11 @@ ShellRoot {
                         visible: panelCard.shownPanel === "user"
                         Layout.margins: 6
                         spacing: 10
-                        Icon { text: "person_crop_circle_fill"; font.pixelSize: 30 }
+                        Icon { text: root.nf.user; font.pixelSize: 30 }
                         ColumnLayout {
                             spacing: 0
                             Layout.fillWidth: true
-                            Label { text: root.userName; font.weight: Font.Medium }
+                            Label { text: root.userName; font.bold: true }
                             Label { text: [root.hostName, `Up ${root.uptimeText}`].filter(t => t !== "").join("  ·  "); color: "#99ffffff"; font.pixelSize: 11 }
                         }
                     }
@@ -2274,101 +2784,271 @@ ShellRoot {
                         color: "#26ffffff"
                     }
                     MenuItem {
-                        visible: panelCard.shownPanel === "user"; icon: "lock_fill"; label: "Lock"
+                        visible: panelCard.shownPanel === "user"; icon: root.nf.lock; label: "Lock"
                         onClicked: { root.panel = ""; root.locked = true; }
                     }
                     MenuItem {
-                        visible: panelCard.shownPanel === "user"; icon: "moon_fill"; label: "Suspend"
+                        visible: panelCard.shownPanel === "user"; icon: root.nf.moon; label: "Suspend"
                         onClicked: { root.panel = ""; root.run("systemctl suspend"); }
                     }
                     MenuItem {
-                        visible: panelCard.shownPanel === "user"; icon: "square_arrow_right"; label: "Log out"
+                        visible: panelCard.shownPanel === "user"; icon: root.nf.logout; label: "Log out"
                         onClicked: Hyprland.dispatch("hl.dsp.exit()")
                     }
                     MenuItem {
-                        visible: panelCard.shownPanel === "user"; icon: "arrow_clockwise"; label: "Restart"
+                        visible: panelCard.shownPanel === "user"; icon: root.nf.restart; label: "Restart"
                         onClicked: root.run("systemctl reboot")
                     }
                     MenuItem {
-                        visible: panelCard.shownPanel === "user"; icon: "power"; label: "Shut down"
+                        visible: panelCard.shownPanel === "user"; icon: root.nf.power; label: "Shut down"
                         onClicked: root.run("systemctl poweroff")
                     }
 
-                    // Control center: rows that open the other panels, keep awake and notifications
+                    // System: CPU, memory, GPU meters, then storage, network and temperatures (sampled only while open)
+                    SystemView {
+                        visible: panelCard.shownPanel === "system"
+                        active: visible
+                        Layout.fillWidth: true
+                        Layout.margins: 6
+                    }
+
+                    // Control center, laid out like the reference: header, switch tiles, display and sound sliders,
+                    // today, media, notifications
                     RowLayout {
                         visible: panelCard.shownPanel === "control"
-                        Layout.margins: 6
-                        Label { text: "Control Center"; font.weight: Font.Medium; Layout.fillWidth: true }
+                        Layout.fillWidth: true
+                        Layout.leftMargin: 4
+                        Layout.bottomMargin: 8
+                        Label { text: "Control Center"; Layout.fillWidth: true; font { pixelSize: 15; bold: true } }
+                        Label { text: Qt.formatDateTime(clock.date, "ddd d MMM · h:mm AP"); color: root.dim; font.pixelSize: 10 }
                     }
-                    MenuItem {
-                        visible: panelCard.shownPanel === "control"
-                        icon: ""
-                        iconSource: "icons/airdrop.svg"
-                        label: "AirDrop"
-                        onClicked: root.panel = "airdrop"
-                        // Quick toggle; the rest of the row opens the AirDrop panel
-                        Toggle {
-                            visible: airdrop.usable
-                            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
-                            checked: airdrop.receiving
-                            opacity: airdrop.busy ? 0.5 : 1
-                            MouseArea { anchors.fill: parent; onClicked: airdrop.toggle() }
-                        }
-                    }
-                    MenuItem {
-                        visible: panelCard.shownPanel === "control" && root.btAdapter !== null
-                        icon: ""
-                        iconSource: "icons/bluetooth.svg"
-                        label: "Bluetooth" + (root.btAdapter?.enabled && root.btConnected ? `  ·  ${root.btDevices.filter(d => d.connected).length} connected` : "")
-                        onClicked: root.panel = "bluetooth"
-                        Toggle {
-                            anchors { right: parent.right; rightMargin: 10; verticalCenter: parent.verticalCenter }
-                            checked: root.btAdapter?.enabled ?? false
-                            MouseArea { anchors.fill: parent; onClicked: root.btAdapter.enabled = !root.btAdapter.enabled }
-                        }
-                    }
-                    // Keep awake: blocks idle lock and screen-off while on
-                    Rectangle {
+                    GridLayout {
                         visible: panelCard.shownPanel === "control"
                         Layout.fillWidth: true
-                        implicitHeight: 34
-                        radius: 10
-                        color: awakeArea.containsMouse ? "#22ffffff" : "transparent"
+                        columns: 2
+                        columnSpacing: 4
+                        rowSpacing: 4
 
-                        RowLayout {
-                            anchors { fill: parent; leftMargin: 10; rightMargin: 10 }
-                            spacing: 10
-                            Image {
-                                // Framework7 has no cup, so these are custom SVGs in the same style
-                                source: root.keepAwake ? "icons/cup_fill.svg" : "icons/cup.svg"
-                                sourceSize: Qt.size(17, 17)
-                            }
-                            Label { text: "Keep awake"; Layout.fillWidth: true }
-                            Toggle { checked: root.keepAwake }
+                        CcTile {
+                            Layout.row: 0; Layout.column: 0
+                            Layout.preferredWidth: 1
+                            icon: root.ethernet && root.wifiName === "" ? root.nf.ethernet : root.wifiIcon
+                            label: "WI-FI"
+                            sub: !root.wifiOn ? "Off" : root.wifiName || (root.ethernet ? "Ethernet" : "...")
+                            checked: root.wifiOn
+                            onToggled: { root.run(`nmcli radio wifi ${root.wifiOn ? "off" : "on"}`); root.wifiOn = !root.wifiOn; }
+                            onClicked: root.panel = "network"
                         }
-                        MouseArea {
-                            id: awakeArea
-                            anchors.fill: parent
-                            hoverEnabled: true
+                        CcTile {
+                            Layout.row: 0; Layout.column: 1; Layout.rowSpan: 2
+                            Layout.preferredWidth: 1
+                            Layout.fillHeight: true
+                            stacked: true
+                            icon: root.nf.bellOff
+                            label: "DO NOT DISTURB"
+                            sub: root.dnd ? "On" : "Off"
+                            checked: root.dnd
+                            onToggled: root.dnd = !root.dnd
+                            onClicked: root.dnd = !root.dnd
+                        }
+                        CcTile {
+                            Layout.row: 1; Layout.column: 0
+                            Layout.preferredWidth: 1
+                            icon: root.nf.bluetooth
+                            label: "BLUETOOTH"
+                            sub: !(root.btAdapter?.enabled ?? false) ? "Off" : root.btConnected ? `${root.btDevices.filter(d => d.connected).length} connected` : "On"
+                            checked: root.btAdapter?.enabled ?? false
+                            hasToggle: root.btAdapter !== null
+                            onToggled: root.btAdapter.enabled = !root.btAdapter.enabled
+                            onClicked: if (root.btAdapter) root.panel = "bluetooth"
+                        }
+                        CcTile {
+                            Layout.row: 2; Layout.column: 0; Layout.columnSpan: 2
+                            stacked: true
+                            icon: root.nf.nightLight
+                            label: "NIGHT LIGHT"
+                            sub: root.nightLight ? "On · 4000 K" : "Off"
+                            checked: root.nightLight
+                            onToggled: root.nightLight = !root.nightLight
+                            onClicked: root.nightLight = !root.nightLight
+                        }
+                        // Switch: system monitor on the desktop; the tile opens the system panel
+                        CcTile {
+                            Layout.row: 3; Layout.column: 0; Layout.columnSpan: 2
+                            stacked: true
+                            icon: root.nf.memory
+                            label: "SYSTEM"
+                            sub: `CPU ${Math.round(root.cpu * 100)}% · RAM ${Math.round(root.mem.used / root.mem.total * 100)}%`
+                            checked: root.showSysWidget
+                            onToggled: root.showSysWidget = !root.showSysWidget
+                            onClicked: root.panel = "system"
+                        }
+                        CcTile {
+                            Layout.row: 4; Layout.column: 0
+                            Layout.preferredWidth: 1
+                            iconSource: "icons/airdrop.svg"
+                            label: "AIRDROP"
+                            sub: airdrop.stateText
+                            checked: airdrop.busy ? airdrop.turningOn : airdrop.receiving
+                            hasToggle: airdrop.usable
+                            onToggled: airdrop.toggle()
+                            onClicked: root.panel = "airdrop"
+                        }
+                        CcTile {
+                            Layout.row: 4; Layout.column: 1
+                            Layout.preferredWidth: 1
+                            // Custom SVGs: no cup in the icon font's style
+                            iconSource: root.keepAwake ? "icons/cup_fill.svg" : "icons/cup.svg"
+                            label: "KEEP AWAKE"
+                            sub: root.keepAwake ? "On" : "Off"
+                            checked: root.keepAwake
+                            onToggled: root.keepAwake = !root.keepAwake
                             onClicked: root.keepAwake = !root.keepAwake
                         }
                     }
-                    // Notifications, newest first; Clear all dismisses them
-                    Rectangle {
-                        visible: panelCard.shownPanel === "control" && notifications.trackedNotifications.values.length > 0
+
+                    // Display and sound: sparse tick sliders with a handle
+                    ColumnLayout {
+                        visible: panelCard.shownPanel === "control"
                         Layout.fillWidth: true
-                        Layout.leftMargin: 10
-                        Layout.rightMargin: 10
-                        Layout.topMargin: 4
-                        implicitHeight: 1
-                        color: "#26ffffff"
+                        Layout.topMargin: 12
+                        Layout.leftMargin: 4
+                        spacing: 6
+
+                        Label { text: "DISPLAY"; color: root.dim; font { pixelSize: 10; letterSpacing: 1 } }
+                        RowLayout {
+                            spacing: 10
+                            Ticks {
+                                Layout.fillWidth: true
+                                implicitHeight: 14
+                                pitch: 10
+                                handle: true
+                                level: Math.max(0, root.brightness) / 100
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -6
+                                    function set(x) { root.setBrightness((x - 6) / (width - 12) * 100); }
+                                    onPressed: mouse => set(mouse.x)
+                                    onPositionChanged: mouse => set(mouse.x)
+                                    onWheel: wheel => root.setBrightness(root.brightness + (wheel.angleDelta.y > 0 ? 5 : -5))
+                                }
+                            }
+                            Label { text: `[ BRT ${root.brightness < 0 ? "--" : root.brightness}% ]`; color: root.dim; font.pixelSize: 10 }
+                            Icon { text: root.brightness < 50 ? root.nf.sunLow : root.nf.sunHigh; font.pixelSize: 14 }
+                        }
+
+                        Label { text: "SOUND"; color: root.dim; Layout.topMargin: 6; font { pixelSize: 10; letterSpacing: 1 } }
+                        RowLayout {
+                            spacing: 10
+                            Ticks {
+                                Layout.fillWidth: true
+                                implicitHeight: 14
+                                pitch: 10
+                                handle: true
+                                level: root.volume
+                                muted: root.muted
+                                MouseArea {
+                                    anchors.fill: parent
+                                    anchors.margins: -6
+                                    function set(x) { if (root.sink?.audio) root.sink.audio.volume = Math.max(0, Math.min(1, (x - 6) / (width - 12))); }
+                                    onPressed: mouse => set(mouse.x)
+                                    onPositionChanged: mouse => set(mouse.x)
+                                    onWheel: wheel => { if (root.sink?.audio) root.sink.audio.volume = Math.max(0, Math.min(1, root.volume + (wheel.angleDelta.y > 0 ? 0.02 : -0.02))); }
+                                }
+                            }
+                            Label { text: `[ VOL ${Math.round(root.volume * 100)}% ]`; color: root.dim; font.pixelSize: 10 }
+                            IconButton {
+                                text: root.volumeIcon
+                                font.pixelSize: 14
+                                closesPanel: false
+                                onClicked: if (root.sink?.audio) root.sink.audio.muted = !root.muted
+                            }
+                        }
                     }
+
+                    // Today, and the next marked days from the desktop calendar
+                    Rectangle { visible: panelCard.shownPanel === "control"; Layout.fillWidth: true; Layout.topMargin: 12; implicitHeight: 1; color: "#26ffffff" }
+                    RowLayout {
+                        visible: panelCard.shownPanel === "control"
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10
+                        Layout.leftMargin: 4
+                        spacing: 8
+                        Icon { text: root.nf.calendar; font.pixelSize: 13 }
+                        Label { text: Qt.formatDate(clock.date, "dddd d MMMM"); Layout.fillWidth: true; font { pixelSize: 13; bold: true } }
+                        Label { text: Qt.formatDate(clock.date, "yyyy"); color: root.dim; font.pixelSize: 10 }
+                    }
+                    Label {
+                        readonly property var upcoming: root.marks.filter(m => m >= root.dayKey(clock.date)).slice(0, 3)
+                        visible: panelCard.shownPanel === "control"
+                        Layout.fillWidth: true
+                        Layout.topMargin: 6
+                        Layout.bottomMargin: 6
+                        horizontalAlignment: Text.AlignHCenter
+                        text: upcoming.length === 0 ? "No upcoming events"
+                            : "Marked: " + upcoming.map(m => Qt.formatDate(new Date(`${m}T00:00`), "ddd d MMM")).join(" · ")
+                        color: root.dim
+                        font.pixelSize: 11
+                    }
+
+                    // Media: art, title, artist, player; then controls
+                    Rectangle { visible: panelCard.shownPanel === "control" && !!root.player; Layout.fillWidth: true; Layout.topMargin: 6; implicitHeight: 1; color: "#26ffffff" }
+                    RowLayout {
+                        visible: panelCard.shownPanel === "control" && !!root.player
+                        Layout.fillWidth: true
+                        Layout.topMargin: 10
+                        Layout.leftMargin: 4
+                        spacing: 10
+                        ClippingRectangle {
+                            implicitWidth: 44
+                            implicitHeight: 44
+                            color: "#1affffff"
+                            Image {
+                                id: ccArt
+                                anchors.fill: parent
+                                source: root.player?.trackArtUrl ?? ""
+                                fillMode: Image.PreserveAspectCrop
+                                sourceSize: Qt.size(88, 88)
+                                asynchronous: true
+                            }
+                            Icon { anchors.centerIn: parent; visible: ccArt.status !== Image.Ready; text: root.nf.music; color: "#66ffffff" }
+                        }
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 1
+                            Label { Layout.fillWidth: true; text: root.player?.trackTitle || root.player?.identity || ""; font.bold: true; elide: Text.ElideRight }
+                            Label { Layout.fillWidth: true; text: root.player?.trackArtist ?? ""; color: root.dim; font.pixelSize: 11; elide: Text.ElideRight }
+                            Label { Layout.fillWidth: true; text: (root.player?.identity ?? "").toLowerCase(); color: "#59ffffff"; font.pixelSize: 9 }
+                        }
+                    }
+                    RowLayout {
+                        visible: panelCard.shownPanel === "control" && !!root.player
+                        Layout.alignment: Qt.AlignHCenter
+                        Layout.topMargin: 6
+                        Layout.bottomMargin: 4
+                        spacing: 26
+                        IconButton { text: root.nf.prev; font.pixelSize: 14; closesPanel: false; enabled: root.player?.canGoPrevious ?? false; opacity: enabled ? 1 : 0.4; onClicked: root.player.previous() }
+                        IconButton { text: root.player?.isPlaying ? root.nf.pause : root.nf.play; font.pixelSize: 18; closesPanel: false; onClicked: root.player.togglePlaying() }
+                        IconButton { text: root.nf.next; font.pixelSize: 14; closesPanel: false; enabled: root.player?.canGoNext ?? false; opacity: enabled ? 1 : 0.4; onClicked: root.player.next() }
+                    }
+
+                    Rectangle { visible: panelCard.shownPanel === "control"; Layout.fillWidth: true; Layout.topMargin: 6; implicitHeight: 1; color: "#26ffffff" }
+                    Label {
+                        visible: panelCard.shownPanel === "control" && notifications.trackedNotifications.values.length === 0
+                        Layout.fillWidth: true
+                        Layout.topMargin: 18
+                        Layout.bottomMargin: 14
+                        horizontalAlignment: Text.AlignHCenter
+                        text: "No notifications"
+                        color: "#59ffffff"
+                    }
+                    // Notifications, newest first; Clear all dismisses them
                     RowLayout {
                         visible: panelCard.shownPanel === "control" && notifications.trackedNotifications.values.length > 0
                         Layout.margins: 6
-                        Label { text: "Notifications"; font.weight: Font.Medium; Layout.fillWidth: true }
+                        Header { text: "NOTIFICATIONS"; Layout.fillWidth: true }
                         Label {
-                            text: "Clear all"
+                            text: "[ clear all ]"
                             color: "#99ffffff"
                             MouseArea {
                                 anchors.fill: parent
@@ -2376,11 +3056,11 @@ ShellRoot {
                             }
                         }
                     }
-                    // Scrolls past 320px: the bar surface is 640px tall
+                    // Scrolls past 220px, so the control center fits the bar surface
                     Flickable {
                         visible: panelCard.shownPanel === "control"
                         Layout.fillWidth: true
-                        Layout.preferredHeight: Math.min(contentHeight, 320)
+                        Layout.preferredHeight: Math.min(contentHeight, 220)
                         contentHeight: notifList.implicitHeight
                         clip: true
 
@@ -2396,15 +3076,16 @@ ShellRoot {
                                     required property var modelData
                                     Layout.fillWidth: true
                                     implicitHeight: entryBody.implicitHeight + 16
-                                    radius: 12
-                                    color: "#1affffff"
+                                    color: "transparent"
+                                    border.width: 1
+                                    border.color: "#2e2e2e"
 
                                     ColumnLayout {
                                         id: entryBody
                                         anchors { left: parent.left; right: dismiss.left; verticalCenter: parent.verticalCenter; leftMargin: 12 }
                                         spacing: 1
-                                        Label { text: entry.modelData.appName; color: "#99ffffff"; font.pixelSize: 11 }
-                                        Label { text: entry.modelData.summary; font.weight: Font.Medium; elide: Text.ElideRight; Layout.fillWidth: true }
+                                        Label { text: entry.modelData.appName.toUpperCase(); color: root.dim; font { pixelSize: 10; letterSpacing: 1 } }
+                                        Label { text: entry.modelData.summary; font.bold: true; elide: Text.ElideRight; Layout.fillWidth: true }
                                         Label {
                                             text: entry.modelData.body
                                             visible: text !== ""
@@ -2418,7 +3099,7 @@ ShellRoot {
                                     IconButton {
                                         id: dismiss
                                         anchors { right: parent.right; top: parent.top; margins: 8 }
-                                        text: "xmark"
+                                        text: root.nf.close
                                         font.pixelSize: 15
                                         closesPanel: false
                                         onClicked: entry.modelData.dismiss()
@@ -2431,7 +3112,7 @@ ShellRoot {
                     // Panels opened from the control center lead back to it
                     MenuItem {
                         visible: ["airdrop", "bluetooth"].includes(panelCard.shownPanel)
-                        icon: "chevron_left"
+                        icon: root.nf.left
                         label: "Control Center"
                         onClicked: root.panel = "control"
                     }
@@ -2441,7 +3122,6 @@ ShellRoot {
                         visible: panelCard.shownPanel === "airdrop"
                         Layout.fillWidth: true
                         implicitHeight: 44
-                        radius: 10
                         color: airdropArea.containsMouse && airdrop.usable ? "#22ffffff" : "transparent"
 
                         RowLayout {
@@ -2451,28 +3131,14 @@ ShellRoot {
                             ColumnLayout {
                                 Layout.fillWidth: true
                                 spacing: 0
-                                Label { text: "AirDrop"; font.weight: Font.Medium; Layout.fillWidth: true }
+                                Label { text: "AirDrop"; font.bold: true; Layout.fillWidth: true }
                                 Label { text: airdrop.stateText; color: "#99ffffff"; font.pixelSize: 11; Layout.fillWidth: true }
                             }
                             // Switch; shows where it's going while busy
-                            Rectangle {
+                            Toggle {
                                 visible: airdrop.usable
-                                readonly property bool on: airdrop.busy ? airdrop.turningOn : airdrop.receiving
-                                implicitWidth: 34
-                                implicitHeight: 20
-                                radius: 10
-                                color: on ? "white" : "#33ffffff"
+                                checked: airdrop.busy ? airdrop.turningOn : airdrop.receiving
                                 opacity: airdrop.busy ? 0.6 : 1
-                                Behavior on color { ColorAnimation { duration: 150 } }
-                                Rectangle {
-                                    width: 16
-                                    height: 16
-                                    radius: 8
-                                    y: 2
-                                    x: parent.on ? parent.width - width - 2 : 2
-                                    color: parent.on ? "black" : "white"
-                                    Behavior on x { Motion { spring: 6; damping: 0.46; epsilon: 0.25 } }
-                                }
                             }
                         }
                         MouseArea {
@@ -2508,23 +3174,15 @@ ShellRoot {
                         Layout.leftMargin: 10
                         Layout.rightMargin: 10
                         spacing: 10
-                        Icon { text: "timer"; Layout.preferredWidth: 22; horizontalAlignment: Text.AlignHCenter }
+                        Icon { text: root.nf.timer; Layout.preferredWidth: 22; horizontalAlignment: Text.AlignHCenter }
                         Item {
                             Layout.fillWidth: true
                             implicitHeight: 20
                             readonly property int last: airdrop.windowStops.length - 1
-                            Rectangle {
+                            Ticks {
                                 anchors.verticalCenter: parent.verticalCenter
                                 width: parent.width
-                                height: 6
-                                radius: 3
-                                color: "#33ffffff"
-                                Rectangle {
-                                    width: 6 + (parent.width - 6) * airdrop.windowIndex / parent.parent.last
-                                    height: parent.height
-                                    radius: 3
-                                    color: "white"
-                                }
+                                level: (airdrop.windowIndex + 1) / (parent.last + 1)
                             }
                             MouseArea {
                                 anchors.fill: parent
@@ -2548,13 +3206,13 @@ ShellRoot {
                     }
                     MenuItem {
                         visible: panelCard.shownPanel === "airdrop" && airdrop.usable
-                        icon: airdrop.audience === "everyone" ? "checkmark_alt" : ""
+                        icon: airdrop.audience === "everyone" ? root.nf.check : ""
                         label: "Everyone"
                         onClicked: airdrop.setAudience("everyone")
                     }
                     MenuItem {
                         visible: panelCard.shownPanel === "airdrop" && airdrop.usable
-                        icon: airdrop.audience === "contacts" ? "checkmark_alt" : ""
+                        icon: airdrop.audience === "contacts" ? root.nf.check : ""
                         label: `Contacts only  ·  ${airdrop.senders} known ${airdrop.senders === 1 ? "sender" : "senders"}`
                         onClicked: airdrop.setAudience("contacts")
                     }
@@ -2582,7 +3240,7 @@ ShellRoot {
                         MenuItem {
                             required property var modelData
                             readonly property bool target: airdrop.sendingTo === modelData.mac
-                            icon: target && airdrop.sendFailed ? "exclamationmark_circle" : "paperplane"
+                            icon: target && airdrop.sendFailed ? root.nf.alert : root.nf.send
                             label: modelData.name + (target && airdrop.sendStatus !== "" ? `  ·  ${airdrop.sendStatus}` : "")
                             opacity: airdrop.sending && !target ? 0.5 : 1
                             onClicked: target ? (airdrop.sending ? airdrop.cancelSend() : airdrop.dismissSend()) : airdrop.send(modelData.mac)
@@ -2590,7 +3248,7 @@ ShellRoot {
                     }
                     MenuItem {
                         visible: panelCard.shownPanel === "airdrop" && airdrop.usable
-                        icon: "folder"
+                        icon: root.nf.folder
                         label: `Save to ${airdrop.dir.replace(Quickshell.env("HOME"), "~") || "…"}`
                         onClicked: airdrop.pickDir()
                     }
@@ -2622,7 +3280,7 @@ ShellRoot {
                         visible: panelCard.shownPanel === "bluetooth" && (root.btAdapter?.enabled ?? false)
                         Layout.margins: 6
                         Layout.topMargin: 8
-                        Label { text: "Nearby"; color: "#99ffffff"; Layout.fillWidth: true }
+                        Header { text: "NEARBY"; color: root.dim; Layout.fillWidth: true }
                         Label { text: root.btAdapter?.discovering ? "Searching…" : ""; color: "#99ffffff" }
                     }
                     Repeater {

@@ -1,5 +1,4 @@
 ttf-rubik-vf
 darkly-bin
 omdrop-owl
-qt6ct-kde
 breeze-plus

@@ -49,7 +49,7 @@ if at_least full && ! grep -q '^\[net-merge\]' /etc/pacman.conf; then
   # lsign by pinned fingerprint: fails if the downloaded key isn't the expected one
   curl -fsSL https://rohit267.github.io/net-merge/apt/key.asc | sudo pacman-key --add -
   sudo pacman-key --lsign-key 0168C7AB77721656904811AE904F61E7F4F1C2A1
-  printf '\n[net-merge]\nSigLevel = Required\nServer = https://rohit267.github.io/net-merge/arch/$arch\n' \
+  printf '\n[net-merge]\nSigLevel = Required\nServer = https://pkg.net-merge.org/arch/$arch\n' \
     | sudo tee -a /etc/pacman.conf >/dev/null
 fi
 
@@ -90,22 +90,6 @@ done
 cd "$REPO"
 fc-cache -f >/dev/null
 
-step "Qt theme (qt6ct)"
-# Generated rather than linked: qt6ct needs an absolute path to the colour scheme
-mkdir -p ~/.config/qt6ct
-cat > ~/.config/qt6ct/qt6ct.conf <<EOF
-[Appearance]
-color_scheme_path=$HOME/.local/share/color-schemes/Island.colors
-custom_palette=true
-icon_theme=breeze-plus-dark
-standard_dialogs=default
-style=Darkly
-
-[Fonts]
-fixed="JetBrainsMono Nerd Font,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
-general="Rubik,11,-1,5,400,0,0,0,0,0,0,0,0,0,0,1"
-EOF
-
 step "GPU symlinks for hyprland.lua"
 # Machine-specific: point igpu-card (and nvidia-card on hybrid machines) at the right /dev/dri/by-path card.
 if [[ ! -e ~/.config/hypr/igpu-card ]]; then
@@ -116,7 +100,7 @@ fi
 
 step "Services and settings"
 sudo systemctl enable --now NetworkManager bluetooth
-[[ "$(getent passwd "$USER" | cut -d: -f7)" == /usr/bin/fish ]] || chsh -s /usr/bin/fish
+[[ "$(getent passwd "$USER" | cut -d: -f7)" == /usr/bin/zsh ]] || chsh -s /usr/bin/zsh
 sudo usermod -aG i2c "$USER"
 echo i2c-dev | sudo tee /etc/modules-load.d/i2c-dev.conf >/dev/null
 # dbus-run-session so gsettings also works from a TTY before the first graphical login
@@ -149,5 +133,5 @@ fi
 if at_least desktop; then
   step "Done. Reboot and log in to Hyprland from GDM."
 else
-  step "Done. Reboot and log in on tty1; fish starts Hyprland (conf.d/auto-Hypr.fish)."
+  step "Done. Reboot and log in on tty1; Zsh starts Hyprland (~/.zprofile)."
 fi

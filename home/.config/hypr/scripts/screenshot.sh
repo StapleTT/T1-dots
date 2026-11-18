@@ -7,7 +7,7 @@ set -eu
 case "${1:-region}" in
     region)
         # Styled like the bar: dimmed screen, white outline. Esc / right click cancels.
-        geom=$(slurp -d -b '#00000055' -c '#ffffffdd' -s '#ffffff12' -w 2 -F Rubik) || exit 0
+        geom=$(slurp -d -b '#00000055' -c '#ffffffdd' -s '#ffffff12' -w 1 -F 'JetBrainsMono Nerd Font') || exit 0
         ;;
     screen)
         output=$(hyprctl monitors -j | jq -r '.[] | select(.focused) | .name')

@@ -18,6 +18,7 @@ x-scheme-handler/sgdb=com.steamgriddb.SGDBoop.desktop
 application/x-mswinurl=netmojo.omdrop-links.desktop
 application/x-webloc=netmojo.omdrop-links.desktop
 video/matroska=vlc.desktop
+x-scheme-handler/discord-1557101333037711371=discord-1557101333037711371.desktop
 
 [Added Associations]
 x-scheme-handler/http=zen.desktop;

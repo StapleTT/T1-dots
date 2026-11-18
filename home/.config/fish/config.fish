@@ -4,7 +4,7 @@ if status is-interactive
     set fish_greeting
 
     # path
-    fish_add_path ~/.local/bin
+    fish_add_path ~/.local/bin ~/models/llama.cpp/build/bin
 
     # Use starship
     function starship_transient_prompt_func
@@ -21,6 +21,7 @@ if status is-interactive
     alias celar "printf '\033[2J\033[3J\033[1;1H'"
     alias claer "printf '\033[2J\033[3J\033[1;1H'"
     alias pamcan pacman
+    alias q 'qs -c ii'
     if test "$TERM" != "linux"
         alias ls 'eza --icons=auto'
     end
@@ -28,3 +29,7 @@ if status is-interactive
         alias ssh 'kitten ssh'
     end
 end
+
+# Added by LM Studio CLI (lms)
+fish_add_path --append --path ~/.lmstudio/bin
+# End of LM Studio CLI section

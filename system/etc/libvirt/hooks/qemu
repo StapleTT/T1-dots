@@ -39,11 +39,17 @@ started/begin)
     systemd-run --unit=win11-inhibit --collect \
         systemd-inhibit --what=sleep --who=win11 --why="Windows VM is running" sleep infinity
     # Hand over the Quest if it's already plugged in (see /etc/udev/rules.d/70-quest-vm.rules).
-    udevadm trigger --action=add /sys/bus/usb/devices/2-1 2>/dev/null
+    udevadm trigger --action=add /sys/bus/usb/devices/2-1 2>/dev/null || true
     ;;
 release/end)
     # Also covers a VM start that failed after GDM was stopped.
-    systemctl --no-block start gdm
+    # A greeter started while the VM held the card only drives the iGPU, so restart it to light both.
+    # Skip the restart if someone logged in meanwhile: it would end their session.
+    if loginctl list-sessions --no-legend | awk '$6 == "user" {f = 1} END {exit !f}'; then
+        systemctl --no-block start gdm
+    else
+        systemctl --no-block restart gdm
+    fi
     systemctl stop win11-inhibit 2>/dev/null
     mountpoint -q "$rocket" || mount "$rocket"
     ;;
